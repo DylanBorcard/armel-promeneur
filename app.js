@@ -1,4 +1,6 @@
-/* Prototype du site d'Armel Promeneur (V4) — JavaScript sans framework ni bibliothèque.
+/* Prototype du site d'Armel Promeneur (V5) — JavaScript sans framework ni bibliothèque.
+   V5 (téléphone et tablette seulement) : rangée de l'accueil qui défile toute seule en boucle, photos en fondu
+   une fois décodées, plus de dévoilement par clip-path ni de glissement d'indice. L'ordinateur ne change pas.
    Routage par hash (#/galerie, #/oeuvre/07…), marche aussi ouvert en file://.
    Les données viennent de data.js (window.SITE). Rien n'est envoyé sur internet.
    Mouvement : seulement transform, opacity et clip-path ; tout est coupé si prefers-reduced-motion. */
@@ -62,12 +64,14 @@
   var E_ENTREE = 'cubic-bezier(.22,1,.36,1)';
   var E_UI = 'cubic-bezier(.4,0,.2,1)';
   var DUREE_OEUVRE = 6000; // accueil sur ordinateur : 6 s par œuvre
+  var DUREE_TEL = 5000;    // accueil sur téléphone et tablette : 5 s par œuvre (et reprise 5 s après un geste)
 
   var main = document.getElementById('contenu');
   var pied = document.getElementById('pied');
   var mqReduit = window.matchMedia('(prefers-reduced-motion: reduce)');
   var mqOrdi = window.matchMedia('(min-width: 1024px)');
   function reduit() { return mqReduit.matches; }
+  var defilePage = -1e9; // moment du dernier défilement de la page
 
   /* ---------- Petits outils ---------- */
   function noop() {}
@@ -87,7 +91,6 @@
   function grande(o) { return 'img/oeuvre-' + o.n + '.jpg'; }
   // Les deux tailles de chaque œuvre : le navigateur choisit selon la place et l'écran
   function srcset(o) { return vignette(o) + ' 720w, ' + grande(o) + ' ' + o.w + 'w'; }
-  var TAILLE_HEROS = '(min-width: 1024px) 474px, 82vw';
   // Même taille que celle choisie pour l'image affichée (pour précharger les voisines utilement)
   function variante(o, img) { return img && /-720\.jpg$/.test(img.currentSrc || '') ? vignette(o) : grande(o); }
   // Appelle f quand l'image est chargée (tout de suite si c'est déjà fait)
@@ -208,6 +211,7 @@
       galerieDepliee = true;
       b.n = -1;
       dessinerBloc(b);
+      preparerImages(b.el); // téléphone : les nouvelles photos apparaissent en fondu, elles aussi
       var c5 = $$('a.carte', b.el)[4];
       if (c5) c5.focus({ preventScroll: true });
     });
@@ -352,8 +356,7 @@
   /* ---------- Page : accueil ---------- */
   var heros = null;        // œuvre affichée dans le héros (retenue pendant la visite)
   var carArret = false;    // défilement automatique arrêté pour de bon (premier geste ou tour complet)
-  var indiceFait = false;  // téléphone : petit glissement d'indice, une seule fois
-  var car = null;          // carrousel de la page en cours
+  var car = null;         // carrousel de la page en cours
   var pauseManuelle = false; // Pause mise à la main : gardée pendant la visite (retour sur l'accueil compris)
 
   function pageAccueil() {
@@ -398,11 +401,20 @@
             '<a class="cart-voir" data-h="voir" href="' + lienOeuvre(o) + '"><span>Voir l\'œuvre</span> <span aria-hidden="true">→</span></a>' +
           '</div>' +
         '</div>' +
-        // Téléphone et tablette : rangée native à faire glisser, sans défilement automatique
+        // Téléphone et tablette (V5) : rangée native qui défile toute seule et qu'on fait glisser.
+        // Trois copies de la liste (boucle sans fin) ; seule celle du milieu est lue et atteinte au clavier.
+        // Images de 720 px (assez pour un téléphone), emplacement à la largeur de l'œuvre (--r = largeur / hauteur).
         '<div class="hero-m">' +
           '<div class="rangee" tabindex="0" role="group" aria-label="Œuvres à la une&#8239;: faites glisser pour voir la suivante">' +
-            rangee.map(function (x, i) {
-              return '<a class="r-it" href="' + lienOeuvre(x) + '" data-n="' + x.n + '"><img src="' + (i === 0 ? grande(x) + '" srcset="' + srcset(x) + '" sizes="' + TAILLE_HEROS : vignette(x)) + '" alt="' + esc(alt(x)) + '" width="' + x.w + '" height="' + x.h + '"' + (i === 0 ? ' fetchpriority="high"' : ' loading="lazy" decoding="async"') + '></a>';
+            [0, 1, 2].map(function (c) {
+              return rangee.map(function (x, i) {
+                var vraie = c === 1;
+                return '<a class="r-it" href="' + lienOeuvre(x) + '" data-n="' + x.n + '" style="--r:' + ratio(x).toFixed(4) + '"' + (vraie ? '' : ' tabindex="-1" aria-hidden="true"') + '>' +
+                  '<span class="r-cad"><img src="' + vignette(x) + '" alt="' + (vraie ? esc(alt(x)) : '') + '" width="' + x.w + '" height="' + x.h + '"' +
+                  // (lazy partout : sur l'ordinateur la rangée est cachée et ne charge rien ; pas de decoding="async",
+                  //  l'image est déjà décodée quand on la montre)
+                  (vraie && i === 0 ? ' fetchpriority="high"' : '') + ' loading="lazy"></span></a>';
+              }).join('');
             }).join('') +
           '</div>' +
           '<div class="r-barre" aria-hidden="true"><span class="r-pos" style="width:calc(100% / ' + TOTAL + ')"></span></div>' +
@@ -467,10 +479,10 @@
     var st = { anim: null, manuel: pauseManuelle, survol: false, focus: false, horsVue: false, pas: 0 };
     var quitte = false;
     var nettoyage = [];
-    function ecoute(cible, type, f) {
+    function ecoute(cible, type, f, opt) {
       if (!cible || !cible.addEventListener) return;
-      cible.addEventListener(type, f);
-      nettoyage.push(function () { cible.removeEventListener(type, f); });
+      cible.addEventListener(type, f, opt);
+      nettoyage.push(function () { cible.removeEventListener(type, f, opt); });
     }
     function reglage(nom) { return reglageCss(nom, sc); }
 
@@ -738,51 +750,177 @@
       roS.observe(zone);
       nettoyage.push(function () { roS.disconnect(); });
     }
-    // --- Téléphone : rangée native, barre de position, cartel qui suit l'œuvre au centre ---
+    /* --- Téléphone et tablette (V5) : rangée native qui défile toute seule (5 s par œuvre) ---
+       Trois copies de la liste : on part de la copie du milieu. Une fois la rangée immobile, si l'on est dans une
+       copie de bord, on saute sans bruit à la même œuvre de la copie du milieu (contenu identique) : la boucle
+       continue vers la droite sans retour visible. Rien ne touche au défilement pendant un geste ou une inertie.
+       Pause pendant le toucher, reprise 5 s après le dernier geste ; pause hors de vue et onglet caché ;
+       départ après « OK » sur le message d'accueil ; rien d'automatique si le mouvement est réduit. */
     var row = $('.rangee', hero), pos = $('.r-pos', hero), cm = $('.cartel-m', hero);
-    var items = $$('.r-it', row);
-    var rafPos = 0;
-    function majPos() {
-      rafPos = 0;
-      var max = row.scrollWidth - row.clientWidth;
-      var k = max > 0 ? Math.min(1, Math.max(0, row.scrollLeft / max)) : 0;
-      pos.style.transform = 'translateX(' + (k * (items.length - 1) * 100).toFixed(1) + '%)';
+    var items = $$('.r-it', row), offs = [];
+    var auto = false;     // le défilement en cours vient de nous (glissement automatique ou saut de recentrage)
+    var toucher = false, calme = true, focusR = false, horsVueR = false, pretR = false, depart = false;
+    var repere = performance.now(); // dernier geste ou dernier départ automatique
+    var calmeT = 0, autoT = 0, rafPos = 0, cur = -1;
+    function tel() { return !mqOrdi.matches; }
+    // Position de défilement de chaque emplacement (au pixel près : un saut tombe pile sur un point d'arrêt)
+    function mesurer() {
+      if (!items.length) return;
+      var x0 = items[0].getBoundingClientRect().left;
+      offs = items.map(function (it) { return it.getBoundingClientRect().left - x0; });
     }
-    ecoute(row, 'scroll', function () { if (!rafPos) rafPos = requestAnimationFrame(majPos); });
-    if ('IntersectionObserver' in window) {
-      var ioR = new IntersectionObserver(function (es) {
-        es.forEach(function (e) {
-          if (!e.isIntersecting || e.intersectionRatio < 0.6 || mqOrdi.matches) return;
-          var x = PAR_N[e.target.dataset.n];
-          if (!x) return;
-          heros = x; // au retour, la rangée repart de cette œuvre
-          if ($('[data-m="voir"]', cm).getAttribute('href') === lienOeuvre(x)) return; // déjà affichée : rien à réécrire ni à annoncer
-          $('[data-m="type"]', cm).textContent = x.type;
-          $('[data-m="statut"]', cm).innerHTML = statut(x);
-          $('[data-m="voir"]', cm).href = lienOeuvre(x);
+    function indice(x) {
+      var k = 0;
+      for (var i = 1; i < offs.length; i++) if (Math.abs(offs[i] - x) < Math.abs(offs[k] - x)) k = i;
+      return k;
+    }
+    // Le cartel suit l'œuvre affichée (réécrit seulement quand elle change)
+    function afficher(x) {
+      if (!x) return;
+      heros = x; // au retour, la rangée repart de cette œuvre
+      if ($('[data-m="voir"]', cm).getAttribute('href') === lienOeuvre(x)) return;
+      $('[data-m="type"]', cm).textContent = x.type;
+      $('[data-m="statut"]', cm).innerHTML = statut(x);
+      $('[data-m="voir"]', cm).href = lienOeuvre(x);
+    }
+    // Les voisines se chargent d'avance (l'image est prête quand elle arrive)
+    // Une voisine prête hors de l'écran est montrée tout de suite, sans fondu : elle entre déjà dessinée
+    function chargerAutour(i) {
+      [i - 1, i + 1, i + 2, i + 3].forEach(function (k) {
+        var im = items[k] && $('img', items[k]);
+        if (!im) return;
+        if (im.loading === 'lazy') im.loading = 'eager';
+        imagePrete(im, 3000).then(function () {
+          if (!quitte && im.complete && im.naturalWidth && !dansFenetre(items[k])) montrerTout(im);
         });
-      }, { root: row, threshold: [0.6] });
-      items.forEach(function (it) { ioR.observe(it); });
-      nettoyage.push(function () { ioR.disconnect(); });
-    }
-    // Petit glissement d'indice, une seule fois, 1,2 s après l'arrivée
-    if (!indiceFait && !reduit() && !mqOrdi.matches && items[0] && items[0].animate) {
-      var tm = 0;
-      apresMessage(function () {
-        if (quitte || indiceFait) return;
-        tm = setTimeout(function () {
-          indiceFait = true;
-          if (row.scrollLeft > 4) return;
-          items.slice(0, 3).forEach(function (el) {
-            el.animate([{ transform: 'translateX(0)', easing: E_UI }, { transform: 'translateX(-24px)', easing: E_UI }, { transform: 'translateX(0)' }], { duration: 800 });
-          });
-        }, 1200);
       });
-      var annuler = function () { indiceFait = true; clearTimeout(tm); };
-      ecoute(row, 'pointerdown', annuler);
-      ecoute(row, 'scroll', annuler);
-      nettoyage.push(function () { clearTimeout(tm); });
     }
+    // Barre de position et cartel (une fois par image, rien de lourd)
+    function majRangee() {
+      rafPos = 0;
+      if (offs.length < 2) return;
+      var x = row.scrollLeft, i = indice(x);
+      var a = x >= offs[i] - 1 ? i : i - 1, b = Math.min(a + 1, offs.length - 1);
+      var f = b > a ? Math.max(0, Math.min(1, (x - offs[a]) / (offs[b] - offs[a]))) : 0;
+      var p = Math.min(TOTAL - 1, (a % TOTAL) + f);
+      pos.style.transform = 'translateX(' + (p * 100).toFixed(1) + '%)';
+      if (i !== cur) { cur = i; afficher(PAR_N[items[i].dataset.n]); chargerAutour(i); }
+    }
+    function surDefile() {
+      if (!rafPos) rafPos = requestAnimationFrame(majRangee);
+      if (!auto) repere = performance.now(); // geste de la personne, ou son inertie
+      calme = false;
+      clearTimeout(calmeT);
+      calmeT = setTimeout(auCalme, 180);
+    }
+    // Rangée immobile : recentrage si besoin, puis prochain départ
+    function auCalme() {
+      calmeT = 0; calme = true; auto = false;
+      if (toucher || quitte) return;
+      recentrer().then(planifier);
+    }
+    function recentrer() {
+      if (!tel() || offs.length < 3 * TOTAL) return Promise.resolve();
+      var i = indice(row.scrollLeft), c = Math.floor(i / TOTAL);
+      if (c === 1) return Promise.resolve();
+      var j = i + (c === 0 ? TOTAL : -TOTAL);
+      // Les images de l'arrivée sont prêtes et affichées d'un coup (pas de fondu : elles étaient déjà à l'écran)
+      var ims = [j - 1, j, j + 1, j + 2].map(function (k) { return items[k] && $('img', items[k]); }).filter(Boolean);
+      ims.forEach(function (im) { if (im.loading === 'lazy') im.loading = 'eager'; });
+      return Promise.all(ims.map(function (im) { return imagePrete(im, 2000); })).then(function () {
+        if (quitte || toucher || !calme || indice(row.scrollLeft) !== i) return;
+        ims.forEach(function (im) { if (im.complete && im.naturalWidth) montrerTout(im); });
+        auto = true;
+        row.scrollLeft = offs[j] + (row.scrollLeft - offs[i]);
+      });
+    }
+    function autoTel() { return pretR && tel() && !reduit() && !quitte && !toucher && !focusR && !horsVueR && !document.hidden; }
+    function planifier() {
+      clearTimeout(autoT); autoT = 0;
+      if (!autoTel()) return;
+      autoT = setTimeout(avancer, Math.max(60, DUREE_TEL - (performance.now() - repere)));
+    }
+    function avancer() {
+      autoT = 0;
+      if (!autoTel()) return;
+      // Page qui défile, menu ou fenêtre ouverts, rangée pas encore immobile : on réessaie un peu plus tard
+      if (!calme || performance.now() - defilePage < 500 || document.documentElement.classList.contains('bloque')) { autoT = setTimeout(avancer, 500); return; }
+      var i = indice(row.scrollLeft), j = i + 1, im = items[j] && $('img', items[j]);
+      if (!im) return;
+      if (im.loading === 'lazy') im.loading = 'eager';
+      // L'œuvre suivante glisse quand son image est prête (au plus 3 s d'attente)
+      imagePrete(im, 3000).then(function () {
+        if (!autoTel() || !calme || indice(row.scrollLeft) !== i) { planifier(); return; }
+        cm.setAttribute('aria-live', 'off'); // pas d'annonce à chaque œuvre pendant l'automatique
+        auto = true; calme = false;
+        repere = performance.now();
+        row.scrollTo({ left: offs[j], behavior: 'smooth' });
+        clearTimeout(calmeT); calmeT = setTimeout(auCalme, 600); // filet, si aucun défilement ne venait
+      });
+    }
+    // Un geste de la personne : l'automatique s'efface, le cartel reparle aux lecteurs d'écran
+    function gesteTel() { auto = false; repere = performance.now(); cm.setAttribute('aria-live', 'polite'); }
+    ecoute(row, 'scroll', surDefile, { passive: true });
+    ecoute(row, 'touchstart', function () { gesteTel(); toucher = true; clearTimeout(autoT); autoT = 0; }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (t) {
+      ecoute(row, t, function () {
+        toucher = false; repere = performance.now();
+        if (calme) { clearTimeout(calmeT); calmeT = setTimeout(auCalme, 180); }
+      }, { passive: true });
+    });
+    ['wheel', 'keydown', 'pointerdown'].forEach(function (t) { ecoute(row, t, function () { gesteTel(); planifier(); }, { passive: true }); });
+    // Clavier : pause tant que le focus est dans la rangée
+    // (et sur le cartel : « Voir l'œuvre » ne change pas d'œuvre sous le doigt de VoiceOver ou du clavier)
+    [row, cm].forEach(function (z) {
+      ecoute(z, 'focusin', function (e) {
+        var fv = true; try { fv = e.target.matches(':focus-visible'); } catch (x) { /* ancien navigateur */ }
+        if (fv) { focusR = true; gesteTel(); planifier(); }
+      });
+      ecoute(z, 'focusout', function (e) {
+        if (focusR && !row.contains(e.relatedTarget) && !cm.contains(e.relatedTarget)) { focusR = false; repere = performance.now(); planifier(); }
+      });
+    });
+    ecoute(document, 'visibilitychange', function () { if (!document.hidden) repere = performance.now(); planifier(); });
+    ecoute(mqReduit, 'change', planifier);
+    ecoute(mqOrdi, 'change', planifier);
+    if ('IntersectionObserver' in window) {
+      var ioV = new IntersectionObserver(function (es) {
+        var hv = es[es.length - 1].intersectionRatio < 0.5;
+        if (horsVueR && !hv) repere = performance.now(); // de retour à l'écran : 5 s avant de repartir
+        horsVueR = hv;
+        planifier();
+      }, { threshold: [0, 0.5] });
+      ioV.observe(row);
+      nettoyage.push(function () { ioV.disconnect(); });
+    }
+    // Départ sur la première œuvre de la copie du milieu
+    function placerDepart() {
+      if (!tel() || !items.length) return false;
+      mesurer();
+      if (!offs[TOTAL]) return false;
+      auto = true;
+      row.scrollLeft = offs[TOTAL];
+      clearTimeout(calmeT); calmeT = setTimeout(auCalme, 300);
+      majRangee();
+      return true;
+    }
+    depart = placerDepart();
+    // Taille de la rangée qui change (rotation, passage à la tablette) : on remesure et on garde l'œuvre
+    if ('ResizeObserver' in window) {
+      var roR = new ResizeObserver(function () {
+        if (!tel()) return;
+        if (!depart) { depart = placerDepart(); return; }
+        var k = cur;
+        mesurer();
+        if (k >= 0 && calme && !toucher && offs[k] != null) {
+          auto = true; row.scrollLeft = offs[k];
+          clearTimeout(calmeT); calmeT = setTimeout(auCalme, 300);
+        }
+      });
+      roR.observe(row);
+      nettoyage.push(function () { roR.disconnect(); });
+    }
+    apresMessage(function () { if (quitte) return; pretR = true; repere = performance.now(); planifier(); });
 
     construire();
     majBouton();
@@ -797,6 +935,7 @@
         quitte = true;
         if (st.anim) st.anim.cancel();
         if (rafPos) cancelAnimationFrame(rafPos);
+        clearTimeout(autoT); clearTimeout(calmeT);
         cartJeton++;
         clearTimeout(fileT); clearTimeout(repriseT); file = [];
         Object.keys(departs).forEach(function (n) { clearTimeout(departs[n]); });
@@ -960,7 +1099,7 @@
         '<div class="fi">' +
           '<div class="fi-media">' +
             '<div class="fi-mur" data-vue="oeuvre" style="--r:' + ratio(o).toFixed(4) + '">' +
-              '<button type="button" class="fi-zoom" data-zoom aria-label="Voir l\'œuvre en grand"><img src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="(min-width: 760px) 490px, 82vw" alt="' + esc(alt(o)) + ', vue entière" width="' + o.w + '" height="' + o.h + '" fetchpriority="high"></button>' +
+              '<button type="button" class="fi-zoom" data-zoom aria-label="Voir l\'œuvre en grand"><img src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="(min-width: 760px) 490px, 82vw" alt="' + esc(alt(o)) + ', vue entière" width="' + o.w + '" height="' + o.h + '" fetchpriority="high" data-vig="' + vignette(o) + '" style="--vig:url(' + vignette(o) + ')"></button>' +
               // Vue simulée en grand (détail, signature, échelle), posée au clic sur une vignette
               '<div class="fi-sim" aria-live="polite"></div>' +
               // Œuvres précédente et suivante : flèches rondes, même composant que l'accueil
@@ -1251,12 +1390,67 @@
     return { html: html, titre: 'Page introuvable', nav: '', appel: null };
   }
 
+  /* ---------- Téléphone et tablette (V5) : chaque photo apparaît en fondu, une fois chargée ET décodée ----------
+     Jamais de photo à moitié dessinée : elle reste transparente jusqu'à ce qu'elle soit prête, puis fondu de 280 ms.
+     Une photo déjà en mémoire (retour sur une page) s'affiche telle quelle. L'ordinateur garde ses apparitions. */
+  var ioIm = null;
+  // Élément qui porte le fondu : le cadre de la rangée de l'accueil (qui porte l'ombre), sinon l'image
+  function cadreDe(im) { return (im.closest && im.closest('.r-cad')) || im; }
+  // Promesse tenue quand l'image est chargée et décodée (ou en erreur ; au plus « max » ms si donné).
+  // Le décodage seul est plafonné à 1,5 s (decode() bloqué sur certains WebKit) ; le chargement, lui, est attendu
+  function imagePrete(im, max) {
+    var p = new Promise(function (r) {
+      if (!im) { r(); return; }
+      var dec = function () { Promise.race([im.decode ? im.decode() : Promise.resolve(), attendre(1500)]).then(r, r); };
+      if (im.complete) { if (im.naturalWidth) dec(); else r(); return; }
+      im.addEventListener('load', dec, { once: true });
+      im.addEventListener('error', function () { r(); }, { once: true });
+    });
+    return max ? Promise.race([p, attendre(max)]) : p;
+  }
+  // Affichée d'un coup, sans fondu
+  function montrerTout(im) {
+    var c = cadreDe(im);
+    if (ioIm) ioIm.unobserve(c);
+    c.classList.remove('att');
+  }
+  function preparerImages(ctx) {
+    if (!ioIm) return;
+    $$('img', ctx).forEach(function (im) {
+      var c = cadreDe(im);
+      if (c.classList.contains('att') || (im.complete && im.naturalWidth)) return;
+      // Grande image de la fiche : si sa vignette est déjà en mémoire (venue de la rangée, de la galerie), elle est
+      // montrée tout de suite par-dessous (styles.css) ; la grande la remplace en arrivant, sans trou ni pâleur
+      if (im.dataset.vig) { var v = new Image(); v.src = im.dataset.vig; if (v.complete && v.naturalWidth) return; }
+      c.classList.add('att');
+      ioIm.observe(c);
+    });
+  }
+
   /* ---------- Apparitions au défilement (titres et images, une seule fois) ---------- */
   var ioRv = null;
   function preparerApparitions() {
     if (ioRv) { ioRv.disconnect(); ioRv = null; }
+    if (ioIm) { ioIm.disconnect(); ioIm = null; }
     var els = $$('[data-rv]', main);
     if (reduit() || !('IntersectionObserver' in window)) return;
+    // Téléphone et tablette : les photos ont leur fondu (ci-dessus) ; titres en simple fondu, sans cascade
+    var tel = !mqOrdi.matches;
+    if (tel) {
+      ioIm = new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          var c = e.target, im = c.tagName === 'IMG' ? c : $('img', c);
+          ioIm.unobserve(c);
+          if (im.loading === 'lazy') im.loading = 'eager';
+          // Déjà reçue en entrant à l'écran : montrée d'un coup ; sinon fondu, seulement une fois reçue en entier
+          var deja = im.complete && im.naturalWidth;
+          imagePrete(im).then(function () { if (deja) montrerTout(im); else c.classList.add('vu'); });
+        });
+      }, { rootMargin: '0px 0px 120px 0px' });
+      preparerImages(main);
+      els = els.filter(function (el) { return el.tagName !== 'IMG' && !el.querySelector('img'); });
+    }
     // Une image masquée par clip-path n'est vue ni par l'observateur ni par le chargement différé :
     // on observe donc son parent, et on la dévoile une fois chargée
     var cibles = new Map();
@@ -1272,7 +1466,7 @@
         ioRv.unobserve(e.target);
         if (!el) return;
         // 70 ms de décalage, au plus 6 éléments en cascade
-        el.style.setProperty('--d', Math.min(i++, 5) * 70 + 'ms');
+        el.style.setProperty('--d', tel ? '0ms' : Math.min(i++, 5) * 70 + 'ms');
         if (el.tagName === 'IMG' && !el.complete) {
           el.loading = 'eager';
           var montrer = function () { el.classList.add('vu'); };
@@ -1413,7 +1607,7 @@
     if (!a) { dernierClic = null; return; }
     var img = a.querySelector('img');
     if (!img && a.closest('.hero-d')) img = $('.ca-it.centre img', main);
-    if (!img && a.closest('.cartel-m')) img = $('.r-it[href="' + a.getAttribute('href') + '"] img', main);
+    if (!img && a.closest('.cartel-m')) img = $$('.r-it[href="' + a.getAttribute('href') + '"] img', main).filter(dansFenetre)[0] || null; // (la copie visible)
     dernierClic = { href: a.getAttribute('href'), img: img, t: Date.now() };
   }, true);
 
@@ -1422,6 +1616,8 @@
     var c = $$('a[href="#/oeuvre/' + n + '"] img', main).filter(function (i) { return i.getBoundingClientRect().width > 0; });
     var vu = c.filter(dansFenetre)[0];
     if (vu) return vu;
+    // Rangée du téléphone : on ne la fait pas sauter vers une copie hors de l'écran (pas de cible, simple fondu)
+    c = c.filter(function (i) { return !i.closest('.rangee'); });
     if (c[0]) { c[0].scrollIntoView({ block: 'center', inline: 'nearest' }); return c[0]; }
     return null;
   }
@@ -1477,13 +1673,17 @@
         if (source) source.style.viewTransitionName = '';
         router(analyser() || r);
         if (type === 'filtre') { nommerCartes(true); return null; }
-        if (type === 'fiche') { nommerFiche(true); return null; }
+        // L'image qui fait la transition, si elle est déjà reçue, est montrée d'un coup (pas de fondu .att
+        // par-dessus le glissement, qui la ferait pâlir) ; pas encore reçue : elle garde son fondu à l'arrivée
+        var dispo = function (im) { if (im && im.complete && im.naturalWidth) montrerTout(im); };
+        if (type === 'fiche') { nommerFiche(true); dispo($('.fi-zoom img', main)); return null; }
         if (!source) return null;
         cible = r.page === 'oeuvre' ? $('.fi-zoom img', main) : trouverImage(retourN);
         if (!cible) return null;
         cible.style.viewTransitionName = 'oeuvre';
         // On attend l'image prête (au plus 400 ms), sinon elle grandirait vide
-        return Promise.race([cible.decode ? cible.decode().catch(noop) : null, attendre(400)]);
+        var c2 = cible;
+        return Promise.race([c2.decode ? c2.decode().catch(noop) : null, attendre(400)]).then(function () { dispo(c2); });
       });
     } catch (e) { html.removeAttribute('data-vt'); html.removeAttribute('data-sens'); router(r); return; }
     var fin = function () {
@@ -1655,14 +1855,15 @@
     rafDefile = 0;
     document.documentElement.classList.toggle('hd-colle', window.scrollY > 0 && hdEl.getBoundingClientRect().top <= 0);
   }
-  window.addEventListener('scroll', function () { if (!rafDefile) rafDefile = requestAnimationFrame(majDefile); }, { passive: true });
+  // (defilePage : la rangée de l'accueil attend que la page soit immobile pour glisser)
+  window.addEventListener('scroll', function () { defilePage = performance.now(); if (!rafDefile) rafDefile = requestAnimationFrame(majDefile); }, { passive: true });
 
   /* ---------- Redimensionnement ---------- */
   var minuterie = null;
   window.addEventListener('resize', function () {
     clearTimeout(minuterie);
     minuterie = setTimeout(function () {
-      blocs.forEach(function (b) { if (document.body.contains(b.el)) dessinerBloc(b); });
+      blocs.forEach(function (b) { if (document.body.contains(b.el)) { dessinerBloc(b); preparerImages(b.el); } });
       if (window.innerWidth >= 760) fermerMenu(false);
     }, 150);
   });

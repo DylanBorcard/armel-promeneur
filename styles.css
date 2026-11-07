@@ -1,4 +1,5 @@
-/* Prototype du site d'Armel Promeneur (V4) — styles.
+/* Prototype du site d'Armel Promeneur (V5) — styles. V5 : rangée de l'accueil et apparitions du téléphone ;
+   l'ordinateur (≥ 1024 px) ne change pas.
    Jetons repris du canevas. Une seule couleur ajoutée : le rouge de la pastille « vendue ».
    Mouvement : seulement transform, opacity et clip-path ; deux courbes pour les pages (entrée, interface).
    Les réglages du carrousel et des boutons ronds sont regroupés dans :root (--ca-*, --cartel-*, --fl-*).
@@ -358,22 +359,25 @@ main { flex: 1 0 auto; }
   .hero-nav, .hero-c, .hero-d { display: none; }
   .hero-m { display: block; }
 }
+/* V5 : hauteur commune, chaque emplacement a la largeur de son œuvre (plafonnée), écart constant de 14 px :
+   plus de trou, la suivante dépasse toujours à droite. Trois copies de la liste pour la boucle (app.js). */
 .rangee {
-  display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
+  position: relative; display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
   scroll-snap-type: x mandatory; scroll-padding-inline: var(--g);
   padding: 6px var(--g) 22px; scrollbar-width: none;
-  --iw: min(82vw, 440px);
+  --cap: min(82vw, 440px);                                                 /* largeur maximale d'une œuvre */
+  --rh: max(300px, min(calc(var(--cap) * 1.25), calc(100svh - 330px)));   /* hauteur commune */
 }
+@media (max-width: 759px) { .rangee { gap: 16px; } }  /* = la marge : l'œuvre précédente s'arrête pile au bord de l'écran */
 .rangee::-webkit-scrollbar { display: none; }
 .rangee:focus-visible { outline-offset: -4px; }
-.r-it {
-  flex: none; width: var(--iw); height: min(calc(var(--iw) * 1.25), calc(100svh - 330px));
-  min-height: 300px; display: flex; align-items: center; justify-content: flex-start; scroll-snap-align: start;  /* image collée à gauche : la suivante dépasse */
-}
 @media (min-width: 600px) and (max-width: 1023px) {
-  .r-it { height: min(calc(var(--iw) * 1.25), calc(100svh - 440px)); }  /* tablette : le haut de la section suivante dépasse */
+  .rangee { --rh: max(300px, min(calc(var(--cap) * 1.25), calc(100svh - 440px))); }  /* tablette : le haut de la section suivante dépasse */
 }
-.r-it img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; box-shadow: var(--ombre-m); }
+.r-it { flex: none; display: flex; align-items: center; width: min(calc(var(--rh) * var(--r)), var(--cap)); height: var(--rh); scroll-snap-align: start; }
+/* L'ombre est sur le cadre, pas sur l'image ; l'image le remplit (cadre aux proportions de l'œuvre) */
+.r-cad { display: block; width: 100%; aspect-ratio: var(--r); box-shadow: var(--ombre-m); }
+.r-cad img { display: block; width: 100%; height: 100%; max-width: none; object-fit: cover; }
 .r-barre { position: relative; height: 2px; margin: 0 var(--g); background: rgba(17,17,17,.14); overflow: hidden; }
 .r-pos { position: absolute; left: 0; top: 0; bottom: 0; background: var(--noir); }
 .cartel-m { margin: 16px var(--g) 0; }
@@ -454,9 +458,12 @@ main { flex: 1 0 auto; }
   box-shadow: 0 18px 30px -20px rgba(0,0,0,0.45); opacity: 0; transition: opacity .3s var(--e-ui);
 }
 .carte img { display: block; width: 100%; height: auto; background: var(--gris1); }
-/* Survol : léger soulèvement (pas de zoom, qui rognerait l'œuvre) ; l'ombre apparaît par son opacité */
-.carte:hover .carte-im { transform: translateY(-4px); }
-.carte:hover .carte-im::after { opacity: 1; }
+/* Survol : léger soulèvement (pas de zoom, qui rognerait l'œuvre) ; l'ombre apparaît par son opacité.
+   Souris seulement (V5) : sur un écran tactile, le survol « collé » au toucher animait la carte. */
+@media (hover: hover) {
+  .carte:hover .carte-im { transform: translateY(-4px); }
+  .carte:hover .carte-im::after { opacity: 1; }
+}
 .carte-lg { display: block; padding-top: 12px; font-size: 14px; line-height: 1.7; }
 .carte-prix { display: block; font-size: 13px; }
 .defile { display: flex; gap: 16px; overflow-x: auto; margin: 0 calc(-1 * var(--g)); padding: 0 var(--g) 6px; scroll-snap-type: x proximity; scroll-padding-inline: var(--g); }
@@ -999,6 +1006,18 @@ a.ig { display: inline-flex; align-items: center; gap: 8px; }
 /* Grands titres : ligne par ligne, 700 ms, 100 ms entre deux lignes */
 .rv[data-rv="lignes"] .l > span { transform: translateY(105%); }
 .rv.vu[data-rv="lignes"] .l > span { transform: none; transition: transform .7s var(--e-entree) calc(var(--i, 0) * 100ms); }
+/* Téléphone et tablette (V5) : fondus d'opacité seuls et courts ; plus de dévoilement (clip-path) ni de glissement.
+   Photos (.att, posé par app.js) : transparentes jusqu'à être chargées ET décodées, puis fondu de 280 ms. */
+@media (max-width: 1023px) {
+  .att { opacity: 0; }
+  .att.vu { opacity: 1; transition: opacity .28s var(--e-ui); }
+  /* Grande image de la fiche : sa vignette (déjà reçue) dessous, en attendant la grande */
+  .fi-zoom img { background: var(--vig, none) center / 100% 100% no-repeat; }
+  .rv[data-rv=""], .rv[data-rv="lignes"] { opacity: 0; transform: none; }
+  .rv.vu[data-rv=""], .rv.vu[data-rv="lignes"] { opacity: 1; transform: none; transition: opacity .3s var(--e-ui); }
+  .rv[data-rv="lignes"] .l > span { transform: none; }
+  .rv[data-rv="clip"], .rv.vu[data-rv="clip"] { clip-path: none; transition: none; }
+}
 
 /* ---------- Transitions de page (View Transitions) ---------- */
 /* L'ancienne page s'efface (200 ms), la nouvelle apparaît (300 ms) */
@@ -1034,5 +1053,6 @@ html[data-sens="-1"]::view-transition-new(fi-img), html[data-sens="-1"]::view-tr
   .carte:hover .carte-im, .hero-nav a:hover { transform: none; }
   .rv { opacity: 1 !important; transform: none !important; clip-path: none !important; }
   .rv .l > span { transform: none !important; }
+  .att { opacity: 1 !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
