@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armel Promeneur — Peintre et sculpteur</title>
+<meta name="description" content="Armel Promeneur, peintre et sculpteur, de la Guadeloupe à la Suisse. 24 œuvres : peintures, collages, sculptures et dessins.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#FAFAF8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23111111'/%3E%3Ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-weight='700' font-size='27' fill='%23FFFFFF' text-anchor='middle'%3EAP%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="accueil">
+
+<a class="saut" href="#contenu">Aller au contenu</a>
+
+<!-- Bandeau du prototype (choix de Dylan) -->
+<div class="proto" id="proto" role="note" aria-label="Prototype">
+  <div class="proto-in">
+    <p>Prototype de travail&#8239;: statuts et prix fictifs (exemples), textes à compléter.</p>
+    <button type="button" class="proto-x" id="proto-x" aria-label="Fermer le bandeau">×</button>
+  </div>
+</div>
+
+<!-- En-tête : barre à cases (ordinateur) et marque + bouton Menu (téléphone) -->
+<header class="hd" id="hd">
+  <div class="hd-in">
+    <div class="hd-bar">
+      <a class="hd-marque" href="#/">Armel Promeneur</a>
+      <p class="hd-sous">Peintre et sculpteur<br>Guadeloupe · installé en Suisse</p>
+      <nav class="hd-nav" aria-label="Navigation principale">
+        <a href="#/galerie" data-nav="galerie">Galerie <span class="mono">24</span></a>
+        <a href="#/a-propos" data-nav="a-propos">À propos</a>
+        <a href="#/contact" data-nav="contact">Contact</a>
+        <a href="https://www.instagram.com/promeneur_armel_studio/" target="_blank" rel="noopener">Instagram <span class="mono" aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </div>
+  <div class="hd-m">
+    <a class="hd-m-marque" href="#/"><span class="hd-m-nom">Armel Promeneur</span><span class="hd-m-sous">Peintre et sculpteur</span></a>
+    <button type="button" class="burger" id="menu-btn" aria-expanded="false" aria-controls="menu">Menu<svg width="20" height="12" viewBox="0 0 20 12" aria-hidden="true"><path d="M0 1h20M0 11h20" stroke="#111111" stroke-width="1.5"/></svg></button>
+  </div>
+</header>
+
+<!-- Menu plein écran (téléphone) -->
+<div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+  <div class="menu-hd">
+    <a class="hd-m-marque" href="#/"><span class="hd-m-nom">Armel Promeneur</span><span class="hd-m-sous">Peintre et sculpteur</span></a>
+    <button type="button" class="burger" id="menu-x">Fermer<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2l12 12M14 2L2 14" stroke="#111111" stroke-width="1.5"/></svg></button>
+  </div>
+  <nav class="menu-nav" aria-label="Navigation principale">
+    <a href="#/galerie" data-nav="galerie"><span class="mono">01</span><span class="t">Galerie</span></a>
+    <a href="#/a-propos" data-nav="a-propos"><span class="mono">02</span><span class="t">À propos</span></a>
+    <a href="#/contact" data-nav="contact"><span class="mono">03</span><span class="t">Contact</span></a>
+    <a href="https://www.instagram.com/promeneur_armel_studio/" target="_blank" rel="noopener"><span class="mono" aria-hidden="true">↗</span><span class="t">Instagram</span></a>
+  </nav>
+</div>
+
+<main id="contenu" tabindex="-1">
+  <noscript><div class="wrap"><p style="padding:48px 0">Ce prototype a besoin de JavaScript pour s'afficher.</p></div></noscript>
+</main>
+
+<footer class="pied" id="pied"></footer>
+
+<!-- Annonces pour les lecteurs d'écran (nombre d'œuvres après un filtre) -->
+<p class="vh" id="annonce" role="status" aria-live="polite"></p>
+
+<!-- Visionneuse plein écran (fiche œuvre) -->
+<div class="visio" id="visio" role="dialog" aria-modal="true" aria-label="Œuvre en grand" hidden>
+  <button type="button" class="visio-x" id="visio-x" aria-label="Fermer la vue en grand">×</button>
+  <img id="visio-img" alt="">
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
