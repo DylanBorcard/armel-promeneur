@@ -1,6 +1,7 @@
-/* Prototype du site d'Armel Promeneur (V2) — styles.
+/* Prototype du site d'Armel Promeneur (V3) — styles.
    Jetons repris du canevas. Une seule couleur ajoutée : le rouge de la pastille « vendue ».
-   Mouvement : seulement transform, opacity et clip-path, deux courbes (entrée, interface). */
+   Mouvement : seulement transform, opacity et clip-path ; deux courbes pour les pages (entrée, interface).
+   Les réglages du carrousel et des boutons « verre » sont regroupés dans :root (--ca-*, --cartel-*, --fl-*). */
 
 :root {
   --fond: #FAFAF8;
@@ -20,7 +21,45 @@
   --ombre-m: 0 1px 2px rgba(0,0,0,0.10), 0 18px 32px -12px rgba(0,0,0,0.35);
   --e-entree: cubic-bezier(.22,1,.36,1);  /* ce qui apparaît */
   --e-ui: cubic-bezier(.4,0,.2,1);        /* l'interface */
+
+  /* ===== Réglages du mouvement (V3) =====
+     Valeurs de départ : Dylan va envoyer des inspirations, on les réglera ici (app.js lit ces variables). */
+  /* Carrousel de l'accueil (ordinateur) : les œuvres glissent d'une place à l'autre */
+  --ca-duree: 850ms;                        /* durée d'un passage d'œuvre */
+  --ca-courbe: cubic-bezier(.45,.05,.2,1);  /* courbe douce : départ franc, arrivée lente (avant : .65,.05,.36,1, départ jugé lent) */
+  --ca-courbe-reprise: cubic-bezier(.22,1,.36,1); /* clic pendant un mouvement : repart sans freiner */
+  --ca-duree-op: 520ms;                     /* les opacités changent plus vite que le glissement (pas de scène délavée) */
+  --ca-courbe-op: cubic-bezier(.3,0,.2,1);
+  --ca-ecart: 28px;                         /* écart entre deux œuvres */
+  --ca-vois-h: .64;                         /* hauteur des voisines : au plus 64 % de la scène… */
+  --ca-vois-max: .8;                        /* … et au plus 80 % de l'œuvre centrale */
+  --ca-vois-op: .5;                         /* opacité des voisines */
+  --ca-vois-op-survol: .8;                  /* opacité d'une voisine survolée */
+  --ca-appui: .97;                          /* voisine enfoncée au clic, avant de glisser */
+  --ca-fondu: 72px;                         /* fondu des bords de la scène */
+  --ca-ombre: 0 2px 6px rgba(0,0,0,.10), 0 44px 70px -26px rgba(0,0,0,.55); /* ombre de l'œuvre centrale */
+  /* Cartel : sortie vers le haut puis entrée par le bas */
+  --cartel-delai: 120ms;                    /* attente après le début du mouvement */
+  --cartel-sortie: 220ms;
+  --cartel-entree: 460ms;
+  --cartel-dy: 12px;                        /* distance d'entrée */
+  /* Flèches et boutons « verre » */
+  --fl-taille: 56px;
+  --fl-survol: 1.06;                        /* grossissement au survol */
+  --fl-appui: .92;                          /* enfoncement à l'appui */
+  --fl-appui-duree: 120ms;
+  --fl-retour-duree: 400ms;
+  --e-ressort: cubic-bezier(.34,1.56,.64,1);/* retour avec un léger rebond */
+  --onde-duree: 500ms;                      /* onde qui part du bouton */
+  --onde-op: .35;
+  --verre: rgba(255,255,255,.5);
+  --verre-survol: .35;                      /* voile blanc ajouté au survol (opacité) */
+  --verre-repli: rgba(250,250,248,.9);      /* sans backdrop-filter : fond plus opaque */
+  --verre-lisere: rgba(255,255,255,.75);
+  --verre-flou: blur(14px) saturate(1.4);
+  --verre-ombre: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px -10px rgba(0,0,0,.38);
 }
+@media (max-width: 1279px) { :root { --ca-fondu: 40px; --ca-ecart: 20px; } }  /* scène étroite : voisines plus visibles */
 @media (max-width: 759px) { :root { --g: 16px; } }
 
 /* ---------- Base ---------- */
@@ -190,53 +229,100 @@ html.bloque, html.bloque body { overflow: hidden; }
 .hero-d { flex: 0 0 var(--col); min-width: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; gap: 48px; padding: 44px 40px 44px 16px; }
 .hero-tout { font-size: 16px; font-weight: 500; text-decoration: none; color: var(--noir); border-bottom: 1.5px solid var(--noir); padding-bottom: 2px; white-space: nowrap; }
 
-/* Scène : l'œuvre au centre, les voisines qui dépassent, les grandes flèches */
-.scene {
-  position: relative; width: 100%; max-width: 860px; container-type: inline-size;
+/* Scène : carrousel coulissant. Les œuvres sont posées et déplacées par app.js (transform et opacity
+   seulement) ; aucun doublon d'image. Réglages : variables --ca-* en tête du fichier. */
+.scene { position: relative; width: 100%; max-width: 860px; container-type: inline-size; }
+.scene-in { position: relative; height: var(--hh); pointer-events: none; }
+/* Bords de la scène en fondu ; la zone déborde en hauteur pour ne pas couper l'ombre */
+.ca {
+  position: absolute; left: 0; right: 0; top: -100px; bottom: -100px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--ca-fondu), #000 calc(100% - var(--ca-fondu)), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 var(--ca-fondu), #000 calc(100% - var(--ca-fondu)), transparent 100%);
 }
-.scene, .fantome {
-  --wc: min(474px, calc(var(--hh) * var(--r)), calc(100cqw - 290px));        /* largeur de l'œuvre */
-  --p: clamp(32px, calc((100cqw - var(--wc)) / 2 - 76px), 104px);           /* partie visible des voisines */
+.ca-it {
+  position: absolute; left: 50%; top: 50%; display: block; pointer-events: auto; opacity: 0;
+  transition: transform var(--ca-duree) var(--ca-courbe), opacity var(--ca-duree-op) var(--ca-courbe-op);
+  will-change: transform, opacity; -webkit-tap-highlight-color: transparent;
 }
-.scene-in { position: relative; height: var(--hh); display: flex; align-items: center; justify-content: center; }
-/* Changement d'œuvre : copie de l'ancienne œuvre qui s'efface pendant que la nouvelle entre (fondu enchaîné) */
-.fantome { position: absolute; left: 0; right: 0; top: 0; z-index: 2; pointer-events: none; }
-.hero-fig { position: relative; z-index: 2; }
-.hero-fig a { display: block; }
-.hero-fig img { display: block; width: var(--wc); height: auto; box-shadow: var(--ombre); }
-.vois {
-  position: absolute; z-index: 1; top: 50%; transform: translateY(-50%);
-  padding: 0; border: 0; background: none; cursor: pointer; opacity: .55;
-  transition: opacity .3s var(--e-ui);
+.ca.reprise .ca-it { transition-timing-function: var(--ca-courbe-reprise), var(--ca-courbe-op); }
+.ca-it.neuf { transition: none; }          /* œuvre qui arrive (invisible) ou redimensionnement : posée sans mouvement */
+.ca-it.loin { pointer-events: none; }
+.ca-it.vois { cursor: pointer; }
+.ca-it:focus-visible { outline: 2px solid var(--noir); outline-offset: 6px; }
+.ca-in { position: relative; display: block; width: 100%; height: 100%; transition: transform var(--fl-retour-duree) var(--e-ressort); }
+.ca-in img { display: block; width: 100%; height: 100%; max-width: none; background: var(--gris1); box-shadow: var(--ombre-m); }
+/* Ombre plus marquée sous l'œuvre centrale : seule son opacité change */
+.ca-in::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: var(--ca-ombre); opacity: 0; transition: opacity var(--ca-duree) var(--ca-courbe);
 }
-.vois:hover { opacity: .85; }
-/* Une voisine fait au plus 80 % de la hauteur de l'œuvre centrale */
-.vois img { display: block; height: min(calc(var(--hh) * .64), calc(var(--wc) / var(--r) * .8)); width: auto; max-width: none; box-shadow: var(--ombre-m); }
-.vois-p { left: calc(50% - var(--wc) / 2 - var(--p)); }
-.vois-s { right: calc(50% - var(--wc) / 2 - var(--p)); }
+.ca-it.centre .ca-in::after { opacity: 1; }
+/* Voisine cliquée : léger enfoncement, puis elle glisse au centre */
+.ca-it.appuye .ca-in { transform: scale(var(--ca-appui)); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
+@media (hover: hover) {
+  .ca-it.vois:hover {
+    opacity: var(--ca-vois-op-survol) !important;  /* l'opacité de place est posée en ligne par app.js */
+    transition: transform var(--ca-duree) var(--ca-courbe), opacity .3s var(--e-ui);
+  }
+  .ca.reprise .ca-it.vois:hover { transition-timing-function: var(--ca-courbe-reprise), var(--e-ui); }
+}
+
+/* Flèches « verre » : posées sur les voisines, fond translucide flouté, fin liseré clair */
 .fleche {
-  position: absolute; z-index: 3; top: calc(var(--hh) / 2); margin-top: -28px;
-  display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0;
-  border: 1.5px solid var(--noir); border-radius: 50%; background: var(--fond); color: var(--noir); cursor: pointer;
-  box-shadow: 0 8px 18px -10px rgba(0,0,0,.45);
+  position: absolute; z-index: 3; top: calc(var(--hh) / 2); margin-top: calc(var(--fl-taille) / -2);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--fl-taille); height: var(--fl-taille); padding: 0;
+  border: 1px solid var(--verre-lisere); border-radius: 50%;
+  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+  box-shadow: var(--verre-ombre); color: var(--noir); cursor: pointer;
+  transition: transform var(--fl-retour-duree) var(--e-ressort);
+  -webkit-tap-highlight-color: transparent;
 }
-.fleche:hover { background: var(--noir); color: var(--fond); }
-.fleche-p { left: 0; }
-.fleche-s { right: 0; }
-/* Lecture : bouton Pause étiqueté et barre qui se remplit en 6 s */
-.hero-ctl { display: flex; align-items: center; gap: 16px; width: max(var(--wc), 260px); margin: 18px auto 0; }
+/* Au milieu de la partie visible des voisines (même place pour toutes les œuvres) */
+.fleche-p { left: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
+.fleche-s { right: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
+.fleche::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #fff; opacity: 0; transition: opacity .3s var(--e-ui); }
+.fl-ic { position: relative; display: block; transition: transform .35s var(--e-ui); }
+.fl-ic svg { display: block; }
+.onde { position: absolute; inset: -1px; border-radius: 50%; border: 1.5px solid var(--noir); opacity: 0; pointer-events: none; }
+@media (hover: hover) {
+  .fleche:hover { transform: scale(var(--fl-survol)); }
+  .fleche:hover::before { opacity: var(--verre-survol); }
+  .fleche-p:hover .fl-ic { transform: translateX(-3px); }
+  .fleche-s:hover .fl-ic { transform: translateX(3px); }
+}
+/* Appui : le bouton s'enfonce vite, puis revient avec un léger rebond (transition de base) */
+.fleche.appuye { transform: scale(var(--fl-appui)); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
+.fleche:focus-visible { outline: 2px solid var(--noir); outline-offset: 4px; box-shadow: var(--verre-ombre), 0 0 0 4px rgba(255,255,255,.9); }  /* halo blanc : visible aussi sur une œuvre sombre */
+
+/* Lecture : pilule verre plus petite, bouton Pause étiqueté et barre qui se remplit en 6 s */
+.hero-ctl {
+  position: relative; display: flex; align-items: center; gap: 12px; width: 272px; margin: 22px auto 0; padding: 0 18px 0 0;
+  border: 1px solid var(--verre-lisere); border-radius: 23px;
+  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 20px -12px rgba(0,0,0,.3);
+}
 .hero-ctl[hidden] { display: none; }
 .pause {
-  flex: none; display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 16px 0 14px;
-  border: 1.5px solid var(--noir); border-radius: 22px; background: transparent;
-  font: 500 14px var(--f-texte); color: var(--noir); cursor: pointer;
+  position: relative; flex: none; display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 14px 0 16px;
+  border: 0; border-radius: 22px; background: transparent;
+  font: 500 13.5px var(--f-texte); color: var(--noir); cursor: pointer;
+  transition: transform var(--fl-retour-duree) var(--e-ressort); -webkit-tap-highlight-color: transparent;
 }
-.pause:hover { background: var(--noir); color: var(--fond); }
+.pause::before { content: ""; position: absolute; inset: 4px; border-radius: 18px; background: #fff; opacity: 0; transition: opacity .3s var(--e-ui); }
+.pause > span { position: relative; }
+@media (hover: hover) { .pause:hover::before { opacity: .75; } }
+.pause.appuye { transform: scale(.95); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
+.pause:focus-visible { outline-offset: 0; }
 .pause-ic { position: relative; width: 10px; height: 12px; }
 .pause[data-etat="lecture"] .pause-ic { border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
 .pause[data-etat="pause"] .pause-ic { width: 0; height: 0; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent currentColor; }
-.piste { flex: 1 1 auto; height: 2px; background: rgba(17,17,17,.16); overflow: hidden; }
+.piste { flex: 1 1 auto; height: 2px; border-radius: 1px; background: rgba(17,17,17,.14); overflow: hidden; }
 .piste-r { display: block; height: 100%; background: var(--noir); transform: scaleX(0); transform-origin: left center; }
+/* Navigateur sans flou d'arrière-plan : fond plus opaque */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .fleche, .hero-ctl { background: var(--verre-repli); }
+}
 
 /* Cartel */
 .cartel { width: 100%; max-width: 280px; border-top: 1px solid var(--filet); padding-top: 16px; }
@@ -289,12 +375,13 @@ html.bloque, html.bloque body { overflow: hidden; }
 /* ---------- Accueil : présentation et œuvres choisies ---------- */
 .pres { max-width: 1440px; margin: 0 auto; padding: 40px var(--g) 120px; }
 .pres h2 { max-width: 16em; font-family: var(--f-titre); font-weight: 500; font-size: clamp(34px, 4.1vw, 60px); line-height: 1.06; letter-spacing: -0.03em; }
+/* Phrase proposée par nous (pas d'Armel) : étiquette « texte d'exemple » */
+.pres h2 .ex { vertical-align: .55em; margin-left: .35em; }
 .pres-g { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; margin-top: 72px; align-items: start; }
 .pres-portrait { grid-column: 1 / span 4; }
 .pres-portrait img, .pres-bois img { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; object-fit: cover; }
 .pres-c { grid-column: 6 / span 4; padding-top: 8px; }
 .pres-bois { grid-column: 10 / span 3; margin-top: 180px; }
-.pres-bois figcaption { padding-top: 10px; font-size: 13px; }
 .pres-acc { font-size: 13px; }
 .pres-txt { margin-top: 24px; font-size: 18px; line-height: 1.55; }
 .pres-lien { display: inline-flex; gap: 8px; margin-top: 28px; }
@@ -313,7 +400,6 @@ html.bloque, html.bloque body { overflow: hidden; }
   .pres-g { grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 32px; }
   .pres-portrait { grid-column: 1; }
   .pres-bois { grid-column: 2; grid-row: 1; margin-top: 56px; }
-  .pres-bois figcaption { font-size: 12px; }
   .pres-c { grid-column: 1 / -1; padding-top: 16px; }
   .pres-acc { font-size: 12px; }
   .pres-txt { margin-top: 18px; font-size: 16px; }
@@ -350,7 +436,7 @@ html.bloque, html.bloque body { overflow: hidden; }
 .rang { display: flex; gap: 24px; align-items: flex-start; }
 .rang-vide { visibility: hidden; }
 .carte { display: block; min-width: 0; text-decoration: none; color: var(--noir); }
-.carte-hd { display: block; border-top: 1px solid var(--filet); padding: 9px 0 14px; color: var(--gris5); }
+.carte-hd { display: block; padding: 0 0 10px; color: var(--gris5); }  /* sans filet au-dessus (V3) */
 .carte-im { display: block; position: relative; transition: transform .3s var(--e-ui); }
 .carte-im::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -364,11 +450,11 @@ html.bloque, html.bloque body { overflow: hidden; }
 .carte-prix { display: block; font-size: 13px; }
 .defile { display: flex; gap: 16px; overflow-x: auto; margin: 0 calc(-1 * var(--g)); padding: 0 var(--g) 6px; scroll-snap-type: x proximity; scroll-padding-inline: var(--g); }
 .defile .carte { flex: none; width: 200px; scroll-snap-align: start; }
-.defile .carte-hd { padding: 8px 0 10px; }
+.defile .carte-hd { padding: 0 0 8px; }
 .defile .carte-lg { font-size: 13px; padding-top: 10px; }
 @media (max-width: 759px) {
   .justif { gap: 36px; }
-  .carte-hd { padding: 8px 0 12px; }
+  .carte-hd { padding: 0 0 8px; }
   .carte-lg { padding-top: 10px; }
 }
 
@@ -510,10 +596,59 @@ a.ligne:hover .l-fl, a.ligne.actif .l-fl, a.ligne:focus-visible .l-fl { opacity:
 .fi-zoom { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .fi-zoom img { display: block; width: min(490px, 100cqw, calc(100cqh * var(--r))); height: auto; box-shadow: var(--ombre); }
 .fi-vues { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-.vue1 { height: 118px; padding: 8px; border: 0; outline: 1.5px solid var(--noir); outline-offset: -1.5px; background: var(--mur); display: flex; align-items: center; justify-content: center; cursor: zoom-in; }
-.vue1:focus-visible { outline: 2px solid var(--noir); outline-offset: 2px; }
-.vue1 img { display: block; height: 100px; width: auto; max-width: 100%; object-fit: contain; }
-.vue-ph { height: 118px; padding: 10px; border: 1px dashed var(--gris8); display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; font-style: italic; color: var(--gris3); }
+/* Cadre principal : l'œuvre entière, ou la vue simulée choisie (fondu de l'une à l'autre) */
+.fi-mur { position: relative; }
+.fi-zoom { transition: opacity .35s var(--e-ui), visibility 0s; }
+.fi-sim {
+  position: absolute; inset: 0; padding: inherit; display: flex; align-items: center; justify-content: center;
+  opacity: 0; visibility: hidden; transition: opacity .35s var(--e-ui), visibility 0s .35s;
+}
+.fi-mur:not([data-vue="oeuvre"]) .fi-zoom { opacity: 0; visibility: hidden; transition: opacity .35s var(--e-ui), visibility 0s .35s; }
+.fi-mur:not([data-vue="oeuvre"]) .fi-sim { opacity: 1; visibility: visible; transition: opacity .35s var(--e-ui), visibility 0s; }
+/* Vignettes : la vue choisie est encadrée de noir */
+.vue-b {
+  position: relative; display: block; width: 100%; height: 140px; padding: 0; border: 0; overflow: hidden;
+  background: var(--mur); font: inherit; color: var(--noir); text-align: left; cursor: pointer;
+}
+.vue-b::after { content: ""; position: absolute; inset: 0; border: 1.5px solid var(--noir); opacity: 0; transition: opacity .2s var(--e-ui); pointer-events: none; }
+.vue-b[aria-pressed="true"]::after { opacity: 1; }
+@media (hover: hover) { .vue-b[aria-pressed="false"]:hover::after { opacity: .3; } }
+.vue-b:focus-visible { outline: 2px solid var(--noir); outline-offset: 2px; }
+.vue1 { display: flex; align-items: center; justify-content: center; padding: 8px; }
+.vue1 img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; }
+/* Simulations faites avec la photo de l'œuvre (en attendant les vraies photos) */
+.sim { position: absolute; inset: 0; overflow: hidden; }
+.sim-zoom img {
+  position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover;
+  object-position: var(--pos); transform-origin: var(--pos); transform: scale(var(--z));  /* détail ×3, signature ×3,5 */
+}
+.sim-echelle { background: var(--mur); }
+.sim-oe { position: absolute; left: 50%; top: 44%; height: 35%; transform: translate(-50%, -50%); }  /* l'œuvre à ~35 % du mur */
+.sim-oe img { display: block; height: 100%; width: auto; max-width: none; box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 10px 18px -10px rgba(0,0,0,.4); }
+.sim-sol { position: absolute; left: 0; right: 0; top: 78%; height: 1px; background: rgba(17,17,17,.22); }  /* trait de sol */
+/* Vignettes : un peu moins de zoom ; cartouche en bas (en haut quand la zone agrandie est en bas : signatures),
+   la scène « échelle » au-dessus de lui */
+.vue-sim .sim-zoom img { transform: scale(calc(var(--z) * .7)); }
+.vue-sim .cto { top: auto; bottom: 6px; padding: 4px 7px 5px; }
+.vue-sim.cto-haut .cto { top: 6px; bottom: auto; }
+.vue-sim .sim-oe { top: 26%; height: 38%; }
+.vue-sim .sim-sol { top: 45%; }
+/* En grand : détail et signature à la place de l'œuvre, échelle sur tout le mur */
+.fi-sim .sim-zoom { position: relative; inset: auto; width: min(490px, 100cqw, calc(100cqh * var(--r))); aspect-ratio: var(--r); box-shadow: var(--ombre); }
+/* Cartouche « verre » : garde le libellé et dit toujours que c'est une simulation */
+.cto {
+  position: absolute; left: 6px; right: 6px; top: 6px; display: block; padding: 6px 8px 7px; margin: 0;
+  border: 1px solid var(--verre-lisere); border-radius: 8px;
+  background: rgba(255,255,255,.66); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+  box-shadow: 0 6px 16px -8px rgba(0,0,0,.35); color: var(--gris3);
+}
+.cto-lib { display: block; font-size: 11.5px; line-height: 1.3; font-style: italic; }
+.cto-note { display: block; margin-top: 3px; font-size: 10.5px; line-height: 1.3; color: var(--gris5); }
+.cto-note b { font-weight: 600; color: var(--noir); }
+.cto.grand { left: 16px; right: auto; top: auto; bottom: 16px; max-width: min(380px, calc(100% - 32px)); padding: 12px 15px 13px; border-radius: 12px; }
+.cto.grand .cto-lib { font-size: 14px; }
+.cto.grand .cto-note { margin-top: 5px; font-size: 13px; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .cto { background: var(--verre-repli); } }
 .fi-info { flex: 1 1 340px; max-width: 440px; position: sticky; top: 24px; }
 .fi-k { color: var(--gris5); }
 .fi-info h1 { margin: 14px 0 12px; font-family: var(--f-titre); font-weight: 500; font-size: 44px; line-height: 1.1; letter-spacing: -0.02em; }
@@ -570,9 +705,18 @@ details[open] .plus::before { content: "−"; }
   .fi-mur { height: 440px; padding: 33px 24px; }
   .fi-zoom img { box-shadow: var(--ombre-m); }
   .fi-vues { gap: 8px; margin-top: 8px; }
-  .vue1 { height: 80px; padding: 6px; }
-  .vue1 img { height: 66px; }
-  .vue-ph { height: 80px; padding: 4px; font-size: 11px; }
+  .vue-b { height: 84px; }
+  .vue1 { padding: 6px; }
+  .cto { left: 3px; right: 3px; top: 3px; padding: 3px 5px 4px; border-radius: 6px; }
+  .cto-lib { font-size: 10.5px; }
+  .cto-note { margin-top: 1px; font-size: 10px; }
+  .cto.grand { left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 9px 11px 10px; }
+  .cto.grand .cto-lib { font-size: 13px; }
+  .cto.grand .cto-note { font-size: 12px; }
+  .vue-sim .cto { top: auto; bottom: 3px; padding: 3px 5px 4px; }
+  .vue-sim.cto-haut .cto { top: 3px; bottom: auto; }
+  .vue-sim .sim-oe { top: 30%; height: 38%; }
+  .vue-sim .sim-sol { top: 52%; }
   .fi-info h1 { margin: 10px 0 8px; font-size: 30px; line-height: 1.15; }
   .fi-tab { margin-top: 22px; }
   .fi-tab th { width: 36%; padding-right: 10px; }
@@ -680,7 +824,7 @@ details[open] .plus::before { content: "−"; }
 .appel-t { font-family: var(--f-titre); font-weight: 500; font-size: clamp(46px, 4.7vw, 76px); line-height: .96; letter-spacing: -0.04em; }
 .appel-lead { margin-top: 28px; font-size: 19px; line-height: 1.5; }
 .appel-armel { display: flex; align-items: flex-start; gap: 22px; margin-top: 48px; }
-.appel-armel img { flex: none; display: block; width: 140px; height: 140px; object-fit: cover; }
+.appel-armel img { flex: none; display: block; width: 140px; height: 140px; object-fit: cover; object-position: 50% 30%; }
 .appel-cit p, .ap-cit blockquote p { text-wrap: balance; }
 .appel-cit p { font-family: var(--f-titre); font-weight: 500; font-size: 22px; line-height: 1.3; letter-spacing: -0.01em; }
 .appel-sig { margin-top: 12px; color: var(--gris5); }

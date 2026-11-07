@@ -1,4 +1,4 @@
-/* Prototype du site d'Armel Promeneur (V2) — JavaScript sans framework ni bibliothèque.
+/* Prototype du site d'Armel Promeneur (V3) — JavaScript sans framework ni bibliothèque.
    Routage par hash (#/galerie, #/oeuvre/07…), marche aussi ouvert en file://.
    Les données viennent de data.js (window.SITE). Rien n'est envoyé sur internet.
    Mouvement : seulement transform, opacity et clip-path ; tout est coupé si prefers-reduced-motion. */
@@ -28,10 +28,37 @@
     dessins: { tous: 'Tous les dessins', detail: 'du dessin' }
   };
 
+  /* Fiche : vues simulées (détail, signature, échelle), faites avec la photo de l'œuvre en attendant
+     les vraies photos ; le cartouche le dit toujours. Zone agrandie (x y) par œuvre, sinon le centre
+     pour le détail et le coin bas droit pour la signature. */
+  var SIM_DETAIL = { '02': '62% 55%', '07': '38% 40%', '08': '45% 60%' };
+  var SIM_SIGNATURE = { '01': '88% 90%', '02': '4% 96%', '07': '0% 100%', '09': '76% 93%', '10': '72% 95%', '15': '37% 79%' };
+  var SIM_TXT = {
+    detail: { court: '[Détail]', note: 'sera remplacée par une vraie photo du détail' },
+    signature: { lib: '[Photo de la signature]', court: '[Signature]', note: 'sera remplacée par une vraie photo de la signature' },
+    echelle: { lib: '[Vue à l\'échelle, quand les dimensions seront connues]', court: '[Échelle]', note: 'sera remplacée par une vraie vue à l\'échelle' }
+  };
+  function simPos(o, t) { return t === 'detail' ? (SIM_DETAIL[o.n] || '50% 45%') : (SIM_SIGNATURE[o.n] || '94% 94%'); }
+  // Vignette : le cartouche se met du côté opposé à la zone agrandie (en bas d'habitude, en haut pour une signature en bas)
+  function ctoHaut(o, t) { return t !== 'echelle' && parseFloat(simPos(o, t).split(' ')[1]) > 50; }
+  function simHtml(o, t, grand) {
+    var im = '<img src="' + (grand ? grande(o) : vignette(o)) + '" alt="" width="' + o.w + '" height="' + o.h + '" decoding="async">';
+    if (t === 'echelle') return '<span class="sim sim-echelle" aria-hidden="true"><span class="sim-oe">' + im + '</span><span class="sim-sol"></span></span>';
+    var pos = simPos(o, t);
+    return '<span class="sim sim-zoom" aria-hidden="true" style="--pos:' + pos + ';--z:' + (t === 'detail' ? 3 : 3.5) + '">' + im + '</span>';
+  }
+  function cartouche(o, t, grand) {
+    var x = SIM_TXT[t], lib = t === 'detail' ? '[Photo de détail ' + CAT_PLUS[o.cat].detail + ']' : x.lib;
+    var note = '<b>Simulation</b>&#8239;: ' + x.note;
+    if (grand) return '<p class="cto grand"><span class="cto-lib">' + lib + '</span><span class="cto-note">' + note + '</span></p>';
+    return '<span class="cto"><span class="cto-lib"><span class="d-only">' + lib + '</span><span class="m-only">' + x.court + '</span></span>' +
+      '<span class="cto-note"><span class="d-only">' + note + '</span><span class="m-only"><b>Simulation</b></span></span></span>';
+  }
+
   // Œuvre montrée en grand dans la page À propos (une œuvre du catalogue, donc reliée à sa fiche)
   var OEUVRE_APROPOS = '08';
 
-  // Mouvement : deux courbes seulement (entrée, interface)
+  // Mouvement des pages : deux courbes (entrée, interface) ; celles du carrousel sont dans styles.css (--ca-*, --e-ressort)
   var E_ENTREE = 'cubic-bezier(.22,1,.36,1)';
   var E_UI = 'cubic-bezier(.4,0,.2,1)';
   var DUREE_OEUVRE = 6000; // accueil sur ordinateur : 6 s par œuvre
@@ -194,7 +221,7 @@
     var err = function (id) { return '<span class="err" id="' + id + '-err" hidden></span>'; };
     return '<section class="appel' + (grand ? ' grand' : '') + '" id="appel" aria-labelledby="appel-titre"><div class="appel-in">' +
       '<div class="appel-g">' + titre +
-        '<div class="appel-armel"><img src="img/portrait-armel.jpg" alt="Armel Promeneur" width="1110" height="1110"' + (grand ? '' : ' loading="lazy"') + ' decoding="async" data-rv="clip">' +
+        '<div class="appel-armel"><img src="img/portrait-armel-2.jpg" alt="Armel Promeneur" width="900" height="1010"' + (grand ? '' : ' loading="lazy"') + ' decoding="async" data-rv="clip">' +
           '<div><blockquote class="appel-cit"><p>«&#8239;<span class="ph">[Une phrase d\'Armel aux visiteurs, à fournir]</span>&#8239;»</p></blockquote>' +
           '<p class="mono appel-sig">Armel Promeneur</p></div></div>' +
         moyens +
@@ -296,19 +323,21 @@
   var carArret = false;    // défilement automatique arrêté pour de bon (premier geste ou tour complet)
   var indiceFait = false;  // téléphone : petit glissement d'indice, une seule fois
   var car = null;          // carrousel de la page en cours
+  var pauseManuelle = false; // Pause mise à la main : gardée pendant la visite (retour sur l'accueil compris)
 
   function pageAccueil() {
     var o = heros || PAR_N[SITE.phare] || LISTE[0];
     heros = o;
-    var p = voisin(o, -1), s = voisin(o, 1);
     var choisies = SITE.choisies.map(function (n) { return PAR_N[n]; }).filter(Boolean);
     // Rangée du téléphone : à partir de l'œuvre du héros
     var rangee = [];
     for (var k = 0; k < TOTAL; k++) rangee.push(voisin(o, k));
     var nomH1 = '<span class="hero-nom">' + lignes(['Armel', 'Promeneur']) + '</span> ' +
       '<span class="hero-sous"><span class="l"><span style="--i:2">Peintre et sculpteur</span></span></span>';
+    // Flèche fine (trait 1,5 px) et onde qui part du bouton à l'appui
     var fleche = function (d) {
-      return '<svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="' + (d < 0 ? 'M21 8H2M8.5 1.5 2 8l6.5 6.5' : 'M1 8h19M13.5 1.5 20 8l-6.5 6.5') + '" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+      return '<span class="fl-ic" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><path d="' + (d < 0 ? 'M19 7H1.5M7.5 1 1.5 7l6 6' : 'M1 7h17.5M12.5 1l6 6-6 6') + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+        '<span class="onde" aria-hidden="true"></span>';
     };
     var html =
       '<section class="hero" aria-roledescription="carrousel" aria-label="Œuvres à la une"><div class="hero-in">' +
@@ -323,14 +352,9 @@
           '</nav>' +
         '</div>' +
         '<div class="hero-c">' +
-          '<div class="scene" style="--r:' + ratio(o).toFixed(4) + '">' +
-            '<div class="scene-in">' +
-              // Œuvres voisines : plus petites, atténuées, cliquables (doublon des flèches, donc cachées au clavier)
-              '<button type="button" class="vois vois-p" data-h="vp" tabindex="-1" aria-hidden="true"><img data-h="ip" src="' + vignette(p) + '" alt="" width="' + p.w + '" height="' + p.h + '" loading="lazy" decoding="async" fetchpriority="low"></button>' +
-              '<button type="button" class="vois vois-s" data-h="vs" tabindex="-1" aria-hidden="true"><img data-h="is" src="' + vignette(s) + '" alt="" width="' + s.w + '" height="' + s.h + '" loading="lazy" decoding="async" fetchpriority="low"></button>' +
-              // Œuvre centrale : affichée tout de suite (pas de fondu, pas de lazy)
-              '<figure class="hero-fig"><a href="' + lienOeuvre(o) + '" data-h="lien"><img data-h="img" src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="' + TAILLE_HEROS + '" alt="' + esc(alt(o)) + '" width="' + o.w + '" height="' + o.h + '" fetchpriority="high"></a></figure>' +
-            '</div>' +
+          '<div class="scene">' +
+            // Les œuvres (centrale, voisines, entrantes) sont posées ici par brancherCarrousel()
+            '<div class="scene-in" data-h="zone"><div class="ca" data-h="ca"></div></div>' +
             '<button type="button" class="fleche fleche-p" data-h="prec" aria-label="Œuvre précédente">' + fleche(-1) + '</button>' +
             '<button type="button" class="fleche fleche-s" data-h="suiv" aria-label="Œuvre suivante">' + fleche(1) + '</button>' +
             '<div class="hero-ctl" data-h="ctl">' +
@@ -367,7 +391,7 @@
 
       // Présentation : portrait, texte, bois travaillé dehors (le haut du titre dépasse sous le héros)
       '<section class="pres" aria-labelledby="presentation">' +
-        '<h2 id="presentation">Des visages au trait noir, <span class="nw">la couleur</span> posée en collage, <span class="nw">le bois</span> des souches.</h2>' +
+        '<h2 id="presentation">Des visages au trait noir, <span class="nw">la couleur</span> posée en collage, <span class="nw">le bois</span> des souches. <span class="ex">texte d\'exemple</span></h2>' +
         '<div class="pres-g">' +
           '<figure class="pres-portrait"><img src="img/portrait-armel.jpg" alt="Portrait d\'Armel Promeneur, chapeau et lunettes rondes" width="1110" height="1110" loading="lazy" decoding="async" data-rv="clip"></figure>' +
           '<div class="pres-c">' +
@@ -381,7 +405,7 @@
               '<div><dt class="mono">Expositions</dt><dd>Pop-up Pepeuf, Markthalle Basel, juin 2026</dd></div>' +
             '</dl>' +
           '</div>' +
-          '<figure class="pres-bois"><img src="img/atelier-bois.jpg" alt="Armel Promeneur travaillant le bois dehors, dans un jardin" width="1080" height="1080" loading="lazy" decoding="async" data-rv="clip"><figcaption>Le bois, travaillé dehors</figcaption></figure>' +
+          '<figure class="pres-bois"><img src="img/atelier-bois.jpg" alt="Armel Promeneur travaillant le bois dehors, dans un jardin" width="1080" height="1080" loading="lazy" decoding="async" data-rv="clip"></figure>' +
         '</div>' +
       '</section>' +
 
@@ -403,66 +427,18 @@
     };
   }
 
-  // Change l'œuvre du héros (ordinateur) : fondu enchaîné, glissement dans le sens du mouvement.
-  // Rend une promesse tenue quand la nouvelle œuvre commence à entrer.
-  var jetonHeros = 0;
-  function majHeros(o, dir, auto) {
-    heros = o;
-    var sc = $('.scene', main);
-    if (!sc) return Promise.resolve();
-    var p = voisin(o, -1), s = voisin(o, 1);
-    var img = $('[data-h="img"]', sc);
-    // Les voisines en grand sont préchargées une fois l'image affichée chargée, et seulement sur ordinateur
-    function precharger() { if (mqOrdi.matches) [p, s].forEach(function (x) { decoder(variante(x, img)); }); }
-    var jeton = ++jetonHeros;
-    if (!dir) { quandCharge(img, precharger); return Promise.resolve(); } // arrivée : le HTML est déjà juste
-    function poserImg(im, src, x, a, set) { if (set) im.srcset = srcset(x); im.src = src; im.width = x.w; im.height = x.h; im.alt = a; }
-    function poser() {
-      sc.style.setProperty('--r', ratio(o).toFixed(4));
-      poserImg(img, grande(o), o, alt(o), true);
-      poserImg($('[data-h="ip"]', sc), vignette(p), p, '');
-      poserImg($('[data-h="is"]', sc), vignette(s), s, '');
-      $$('[data-h="lien"], [data-h="voir"]', main).forEach(function (a) { a.href = lienOeuvre(o); });
-      $('[data-h="type"]', main).textContent = o.type;
-      $('[data-h="statut"]', main).innerHTML = statut(o);
-    }
-    var inn = $('.scene-in', sc);
-    if (reduit() || !inn.animate) { poser(); quandCharge(img, precharger); return Promise.resolve(); }
-    // Images prêtes avant de changer ; en automatique on attend vraiment, après un geste au plus 600 ms
-    var prets = Promise.all([decoder(variante(o, img)), decoder(vignette(p)), decoder(vignette(s))]);
-    if (!auto) prets = Promise.race([prets, attendre(600)]);
-    return prets.then(function () {
-      if (jeton !== jetonHeros) return;
-      // Copie de l'œuvre affichée, qui garde son format et s'efface par-dessus la nouvelle
-      $$('.fantome', sc).forEach(function (f) { f.remove(); });
-      inn.getAnimations().forEach(function (a) { a.cancel(); });
-      var f = inn.cloneNode(true);
-      f.classList.add('fantome');
-      f.setAttribute('aria-hidden', 'true');
-      f.inert = true;
-      f.style.setProperty('--r', sc.style.getPropertyValue('--r'));
-      sc.insertBefore(f, inn.nextSibling);
-      poser();
-      var entree = inn.animate([{ opacity: 0, transform: 'translateX(' + (24 * dir) + 'px)' }, { opacity: 1, transform: 'translateX(0)' }],
-        { duration: 600, easing: E_ENTREE });
-      entree.pause(); // nouvelle œuvre cachée le temps du décodage
-      return Promise.race([img.decode ? img.decode().catch(noop) : null, attendre(300)]).then(function () {
-        if (jeton !== jetonHeros) { entree.cancel(); f.remove(); return; } // un autre geste a suivi : il fera le fondu
-        entree.play();
-        var sortie = f.animate([{ opacity: 1, transform: 'translateX(0)' }, { opacity: 0, transform: 'translateX(' + (-24 * dir) + 'px)' }],
-          { duration: 300, easing: E_UI, fill: 'forwards' });
-        sortie.finished.then(function () { f.remove(); }, function () { f.remove(); });
-        quandCharge(img, precharger);
-      });
-    });
-  }
-
-  // Carrousel de l'accueil : défilement continu sur ordinateur, rangée native sur téléphone
+  /* ---------- Carrousel de l'accueil ----------
+     Ordinateur : carrousel COULISSANT. Les œuvres sont de vrais éléments, gardés par numéro (n-2 à n+2),
+     posés en absolu dans la scène et déplacés seulement par transform (translateX + scale) et opacity.
+     Les transitions CSS se reprennent d'où elles sont : un clic pendant un mouvement repart sans saut.
+     Réglages (durées, courbes, échelles, opacités) : variables --ca-*, --cartel-*, --fl-* en tête de styles.css.
+     Téléphone : rangée native à faire glisser. */
   function brancherCarrousel() {
     var hero = $('.hero', main);
     var sc = $('.scene', hero), cartel = $('.cartel', hero), ctl = $('[data-h="ctl"]', hero);
+    var zone = $('[data-h="zone"]', hero), ca = $('[data-h="ca"]', hero);
     var rempli = $('[data-h="rempli"]', hero), btn = $('[data-h="pause"]', hero), btnT = $('[data-h="pause-t"]', hero);
-    var st = { anim: null, manuel: false, survol: false, focus: false, horsVue: false, pas: 0 };
+    var st = { anim: null, manuel: pauseManuelle, survol: false, focus: false, horsVue: false, pas: 0 };
     var quitte = false;
     var nettoyage = [];
     function ecoute(cible, type, f) {
@@ -470,6 +446,181 @@
       cible.addEventListener(type, f);
       nettoyage.push(function () { cible.removeEventListener(type, f); });
     }
+    // Valeur d'une variable CSS (« 850ms » ou « .85s » rendent 850)
+    function reglage(nom) {
+      var v = getComputedStyle(sc).getPropertyValue(nom).trim(), x = parseFloat(v);
+      return /\ds$/.test(v) ? x * 1000 : x;
+    }
+
+    /* --- Ordinateur : les œuvres de la scène --- */
+    var FEN = 2;      // œuvres gardées de chaque côté (les places ±2 sont invisibles)
+    var els = {};     // élément de chaque œuvre, par numéro
+    var departs = {}; // œuvres sorties de la fenêtre : retirées une fois leur mouvement fini
+    // Décalage d'une œuvre par rapport à l'œuvre centrale (−12 à +11, la liste tourne en rond)
+    function decal(o) { var d = (rang(o) - rang(heros) + TOTAL) % TOTAL; return d > TOTAL / 2 ? d - TOTAL : d; }
+    function creer(o) {
+      var a = document.createElement('a');
+      a.className = 'ca-it neuf';
+      a.href = lienOeuvre(o);
+      a.setAttribute('data-n', o.n);
+      a.innerHTML = '<span class="ca-in"><img src="' + vignette(o) + '" srcset="' + srcset(o) + '" sizes="474px" alt="" width="' + o.w + '" height="' + o.h + '"' +
+        (o === heros ? ' fetchpriority="high"' : ' decoding="async" fetchpriority="low"') + '></span>';
+      els[o.n] = a;
+      ca.appendChild(a);
+    }
+    function imgDe(o) { return els[o.n] ? els[o.n].querySelector('img') : null; }
+    // Garde n-2 à n+2 ; celles qui sortent sont retirées après leur mouvement (invisibles à ce moment-là)
+    function fenetre() {
+      for (var k = -FEN; k <= FEN; k++) {
+        var o = voisin(heros, k);
+        if (!els[o.n]) creer(o);
+        if (departs[o.n]) { clearTimeout(departs[o.n]); delete departs[o.n]; }
+      }
+      Object.keys(els).forEach(function (n) {
+        if (Math.abs(decal(PAR_N[n])) <= FEN || departs[n]) return;
+        departs[n] = setTimeout(function () {
+          delete departs[n];
+          if (els[n] && Math.abs(decal(PAR_N[n])) > FEN) { els[n].remove(); delete els[n]; }
+        }, reglage('--ca-duree') + 100);
+      });
+    }
+    // Places calculées d'après les proportions de chaque œuvre : centrale à sa taille, voisines à au plus
+    // 80 % de sa hauteur, un écart constant entre deux œuvres (aucun chevauchement, même en mouvement)
+    function placer() {
+      var S = zone.clientWidth, hh = zone.clientHeight;
+      if (!S || !hh) return;
+      // Plafond de l'œuvre centrale : sur une scène étroite (1024 px), plus de place pour les voisines
+      var cap = Math.min(474, S - (S < 640 ? 330 : 290)), ecart = reglage('--ca-ecart'), op = reglage('--ca-vois-op');
+      var taille = function (o) { var w = Math.min(cap, hh * ratio(o)); return { w: w, h: w / ratio(o) }; };
+      var tc = taille(heros);
+      var hv = Math.min(hh * reglage('--ca-vois-h'), tc.h * reglage('--ca-vois-max'));
+      var ks = Object.keys(els).map(function (n) { return decal(PAR_N[n]); });
+      var kmin = Math.min.apply(null, ks.concat(-FEN)), kmax = Math.max.apply(null, ks.concat(FEN));
+      var pos = { 0: { x: 0, s: 1, t: tc } };
+      var suite = function (k, sens) {
+        var t = taille(voisin(heros, k)), s = hv / t.h, p = pos[k - sens];
+        pos[k] = { x: p.x + sens * (p.t.w * p.s / 2 + ecart + t.w * s / 2), s: s, t: t };
+      };
+      for (var k = 1; k <= kmax; k++) suite(k, 1);
+      for (k = -1; k >= kmin; k--) suite(k, -1);
+      sc.style.setProperty('--ca-cap', cap.toFixed(1) + 'px'); // les flèches se centrent sur la partie visible des voisines
+      // Positions en cours (clic pendant un mouvement) : une œuvre neuve part de là où est sa voisine intérieure
+      var cur = {};
+      Object.keys(els).forEach(function (n) {
+        if (els[n].classList.contains('neuf') || !els[n].style.transform || !window.DOMMatrix) return;
+        cur[n] = new DOMMatrix(getComputedStyle(els[n]).transform).e;
+      });
+      var cibles = [];
+      Object.keys(els).forEach(function (n) {
+        var el = els[n], o = PAR_N[n], d = decal(o), p = pos[d], a = Math.abs(d), img = el.querySelector('img');
+        el.style.width = p.t.w.toFixed(1) + 'px';
+        el.style.height = p.t.h.toFixed(1) + 'px';
+        el.style.marginLeft = (-p.t.w / 2).toFixed(1) + 'px';
+        el.style.marginTop = (-p.t.h / 2).toFixed(1) + 'px';
+        var cible = 'translate3d(' + p.x.toFixed(1) + 'px,0,0) scale(' + p.s.toFixed(4) + ')';
+        var j = d - Math.sign(d), c = a >= 2 && pos[j] ? cur[voisin(heros, j).n] : null;
+        if (el.classList.contains('neuf') && c != null && !el.style.transform) {
+          // Posée (invisible) dans le prolongement de sa voisine intérieure, puis elle glisse avec elle
+          el.style.transform = 'translate3d(' + (c + p.x - pos[j].x).toFixed(1) + 'px,0,0) scale(' + p.s.toFixed(4) + ')';
+          cibles.push([el, cible]);
+        } else el.style.transform = cible;
+        el.style.opacity = a === 0 ? '1' : a === 1 ? String(op) : '0';
+        el.classList.toggle('centre', a === 0);
+        el.classList.toggle('vois', a === 1);
+        el.classList.toggle('loin', a > 1);
+        // Seule l'œuvre centrale est un lien lu et atteint au clavier (les voisines doublent les flèches)
+        if (a === 0) { el.removeAttribute('tabindex'); el.removeAttribute('aria-hidden'); img.alt = alt(o); }
+        else { el.tabIndex = -1; el.setAttribute('aria-hidden', 'true'); img.alt = ''; }
+        img.sizes = Math.round(p.t.w) + 'px';
+      });
+      // Les œuvres neuves (ou après un redimensionnement) se posent sans mouvement
+      if ($('.neuf', ca)) {
+        void ca.offsetWidth;
+        $$('.neuf', ca).forEach(function (el) { el.classList.remove('neuf'); });
+        if (cibles.length) { void ca.offsetWidth; cibles.forEach(function (x) { x[0].style.transform = x[1]; }); }
+      }
+    }
+    function precharger() {
+      var im = imgDe(heros);
+      [-3, 3].forEach(function (k) { decoder(variante(voisin(heros, k), im)); });
+    }
+    function construire() {
+      if (!mqOrdi.matches || ca.firstChild) return;
+      fenetre();
+      placer();
+      ecrireCartel();
+      quandCharge(imgDe(heros), precharger);
+    }
+    // Passe à l'œuvre voisine (dir = −1 ou 1)
+    var debut = -1e9, repriseT = 0, file = [], fileT = 0;
+    function aller(dir) {
+      if (!ca.firstChild) return;
+      // Clic pendant un mouvement : repart de la position en cours avec une courbe sans départ lent
+      var maintenant = performance.now(), duree = reglage('--ca-duree');
+      if (maintenant - debut < duree) {
+        ca.classList.add('reprise');
+        clearTimeout(repriseT);
+        repriseT = setTimeout(function () { ca.classList.remove('reprise'); }, duree + 50);
+      }
+      debut = maintenant;
+      var focusDedans = ca.contains(document.activeElement);
+      heros = voisin(heros, dir);
+      fenetre();
+      placer();
+      if (focusDedans) els[heros.n].focus({ preventScroll: true });
+      cartelVers();
+      precharger();
+    }
+
+    /* --- Cartel : sortie vers le haut, puis entrée de 12 px, juste après le début du mouvement --- */
+    function ecrireCartel() {
+      $$('[data-h="voir"]', hero).forEach(function (a) { a.href = lienOeuvre(heros); });
+      $('[data-h="type"]', hero).textContent = heros.type;
+      $('[data-h="statut"]', hero).innerHTML = statut(heros);
+    }
+    var cartAn = [], cartJeton = 0;
+    function cartelVers() {
+      var parts = $$('.cart-titre, .cart-type, .cart-statut, .cart-voir', cartel);
+      var jeton = ++cartJeton;
+      if (reduit() || !cartel.animate) { ecrireCartel(); return; }
+      var delai = reglage('--cartel-delai'), so = reglage('--cartel-sortie'), en = reglage('--cartel-entree'), dy = reglage('--cartel-dy'), pas = 40;
+      // Repart de l'état où se trouve le cartel (clic pendant un changement)
+      cartAn.forEach(function (a) {
+        if (a.playState !== 'finished') { try { a.commitStyles(); } catch (e) { /* rien */ } }
+        a.cancel();
+      });
+      cartAn = parts.map(function (el, i) {
+        return el.animate([{ opacity: 0, transform: 'translateY(' + (-dy / 2) + 'px)' }],
+          { duration: so, delay: delai + i * pas, easing: 'cubic-bezier(.4,0,1,1)', fill: 'both' });
+      });
+      // Quand la dernière ligne est sortie : nouveau texte, puis entrée ligne par ligne
+      cartAn[cartAn.length - 1].finished.then(function () {
+        if (jeton !== cartJeton || quitte) return;
+        ecrireCartel();
+        cartAn.forEach(function (a) { a.cancel(); });
+        cartAn = parts.map(function (el, i) {
+          el.style.opacity = ''; el.style.transform = '';
+          return el.animate([{ opacity: 0, transform: 'translateY(' + dy + 'px)' }, { opacity: 1, transform: 'none' }],
+            { duration: en, delay: i * pas, easing: E_ENTREE, fill: 'backwards' });
+        });
+      }, noop);
+    }
+
+    /* --- Boutons : enfoncement à l'appui (souris, doigt, Entrée/Espace), retour avec rebond, onde --- */
+    function appui(b, onde) {
+      var oui = function () { b.classList.add('appuye'); };
+      var non = function () { b.classList.remove('appuye'); };
+      ecoute(b, 'pointerdown', function (e) { if (e.button === 0) oui(); });
+      ['pointerup', 'pointercancel', 'pointerleave', 'blur', 'keyup'].forEach(function (t) { ecoute(b, t, non); });
+      ecoute(b, 'keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') oui(); });
+      if (onde) ecoute(b, 'click', function () {
+        var o = $('.onde', b);
+        if (!o || !o.animate || reduit()) return;
+        o.animate([{ transform: 'scale(.6)', opacity: reglage('--onde-op') }, { transform: 'scale(1.6)', opacity: 0 }],
+          { duration: reglage('--onde-duree'), easing: 'cubic-bezier(.25,.6,.4,1)' });
+      });
+    }
+
     function autoPossible() { return mqOrdi.matches && !reduit(); }
     function enPause() { return st.manuel || st.survol || st.focus || st.horsVue || document.hidden || !autoPossible(); }
     function majBouton() {
@@ -493,10 +644,14 @@
       st.anim = rempli.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: DUREE_OEUVRE, easing: 'linear', fill: 'forwards' });
       st.anim.onfinish = function () {
         st.pas++;
-        var suite = majHeros(voisin(heros, 1), 1, true);
-        if (st.pas >= TOTAL) { arreter(); return; } // tour complet : arrêt
-        // La barre suivante part quand la nouvelle œuvre est affichée
-        suite.then(function () { if (!quitte && !carArret) lancer(); });
+        if (st.pas >= TOTAL) { aller(1); arreter(); return; } // tour complet : arrêt
+        // L'œuvre suivante glisse quand son image est prête, et la barre repart avec elle
+        var im = imgDe(voisin(heros, 1));
+        Promise.resolve(im && im.decode ? im.decode().catch(noop) : null).then(function () {
+          if (quitte || carArret) return;
+          aller(1);
+          lancer();
+        });
       };
       appliquer();
     }
@@ -506,21 +661,49 @@
       st.anim = null;
       majBouton();
     }
-    function geste(dir) { arreter(); majHeros(voisin(heros, dir), dir); }
+    // Clics rapides : un geste qui arrive avant 40 % du mouvement en cours attend ce moment (au plus 2 en file)
+    function jouerFile() {
+      fileT = 0;
+      if (quitte || !file.length) return;
+      aller(file.shift());
+      if (file.length) fileT = setTimeout(jouerFile, reglage('--ca-duree') * .4);
+    }
+    function geste(dir) {
+      arreter();
+      var reste = debut + reglage('--ca-duree') * .4 - performance.now();
+      if (reduit() || (reste <= 0 && !file.length)) { aller(dir); return; }
+      if (file.length < 2) file.push(dir);
+      if (!fileT) fileT = setTimeout(jouerFile, Math.max(0, reste));
+    }
 
-    $$('[data-h="prec"], [data-h="vp"]', hero).forEach(function (b) { ecoute(b, 'click', function () { geste(-1); }); });
-    $$('[data-h="suiv"], [data-h="vs"]', hero).forEach(function (b) { ecoute(b, 'click', function () { geste(1); }); });
-    // Voisines cachées aux lecteurs d'écran : un clic de souris ne doit pas leur donner le focus
-    $$('[data-h="vp"], [data-h="vs"]', hero).forEach(function (b) { ecoute(b, 'mousedown', function (e) { e.preventDefault(); }); });
-    ecoute(btn, 'click', function () {
-      if (carArret) { carArret = false; st.manuel = false; st.pas = 0; st.focus = false; lancer(); return; }
-      st.manuel = !st.manuel; st.focus = false; appliquer();
+    ecoute($('[data-h="prec"]', hero), 'click', function () { geste(-1); });
+    ecoute($('[data-h="suiv"]', hero), 'click', function () { geste(1); });
+    $$('.fleche', hero).forEach(function (b) { appui(b, true); });
+    appui(btn, false);
+    // Voisines : un clic les fait glisser au centre ; l'œuvre centrale mène à sa fiche
+    ecoute(ca, 'click', function (e) {
+      var it = e.target.closest && e.target.closest('.ca-it');
+      if (!it) return;
+      var d = decal(PAR_N[it.dataset.n]);
+      if (d === 0) return;
+      e.preventDefault();
+      if (Math.abs(d) === 1) geste(d);
     });
-    // Pause au survol de l'œuvre (souris), au focus clavier, onglet caché, héros hors de l'écran
+    // Voisines (cachées aux lecteurs d'écran) : pas de focus à la souris ; léger enfoncement à l'appui
+    ecoute(ca, 'mousedown', function (e) { var it = e.target.closest('.ca-it'); if (it && !it.classList.contains('centre')) e.preventDefault(); });
+    ecoute(ca, 'pointerdown', function (e) { var it = e.target.closest('.ca-it'); if (it && it.classList.contains('vois') && e.button === 0) it.classList.add('appuye'); });
+    ['pointerup', 'pointercancel'].forEach(function (t) {
+      ecoute(document, t, function () { $$('.ca-it.appuye', ca).forEach(function (el) { el.classList.remove('appuye'); }); });
+    });
+    ecoute(ca, 'dragstart', function (e) { e.preventDefault(); });
+    ecoute(btn, 'click', function () {
+      if (carArret) { carArret = false; st.manuel = pauseManuelle = false; st.pas = 0; st.focus = false; lancer(); return; }
+      st.manuel = pauseManuelle = !st.manuel; st.focus = false; appliquer();
+    });
+    // Pause au survol des œuvres (souris), au focus clavier, onglet caché, héros hors de l'écran
     // (zone de survol : les œuvres seulement, pas le bouton Pause ni la barre)
-    var zoneSurvol = $('.scene-in', hero);
-    ecoute(zoneSurvol, 'pointerenter', function (e) { if (e.pointerType === 'mouse') { st.survol = true; appliquer(); } });
-    ecoute(zoneSurvol, 'pointerleave', function () { if (st.survol) { st.survol = false; appliquer(); } });
+    ecoute(zone, 'pointerenter', function (e) { if (e.pointerType === 'mouse') { st.survol = true; appliquer(); } });
+    ecoute(zone, 'pointerleave', function () { if (st.survol) { st.survol = false; appliquer(); } });
     function dansZone(el) { return el && el !== btn && ((sc.contains(el) && !ctl.contains(el)) || cartel.contains(el)); }
     ecoute(hero, 'focusin', function (e) {
       var fv = false; try { fv = e.target.matches(':focus-visible'); } catch (x) { fv = true; }
@@ -528,14 +711,26 @@
     });
     ecoute(hero, 'focusout', function (e) { if (st.focus && !dansZone(e.relatedTarget)) { st.focus = false; appliquer(); } });
     ecoute(document, 'visibilitychange', appliquer);
-    ecoute(mqOrdi, 'change', appliquer);
+    ecoute(mqOrdi, 'change', function () { construire(); appliquer(); });
     ecoute(mqReduit, 'change', function () { if (reduit()) arreter(); appliquer(); });
     if ('IntersectionObserver' in window) {
       var ioH = new IntersectionObserver(function (es) { st.horsVue = es[es.length - 1].intersectionRatio < 0.5; appliquer(); }, { threshold: [0, 0.5, 1] });
       ioH.observe(hero);
       nettoyage.push(function () { ioH.disconnect(); });
     }
-
+    // Redimensionnement : les œuvres se replacent sans mouvement
+    if ('ResizeObserver' in window) {
+      var roS = new ResizeObserver(function () {
+        if (!mqOrdi.matches) return;
+        if (!ca.firstChild) { construire(); return; }
+        fenetre(); // l'œuvre a pu changer entre-temps sur la rangée du téléphone
+        $$('.ca-it', ca).forEach(function (el) { el.classList.add('neuf'); });
+        placer();
+        ecrireCartel();
+      });
+      roS.observe(zone);
+      nettoyage.push(function () { roS.disconnect(); });
+    }
     // --- Téléphone : rangée native, barre de position, cartel qui suit l'œuvre au centre ---
     var row = $('.rangee', hero), pos = $('.r-pos', hero), cm = $('.cartel-m', hero);
     var items = $$('.r-it', row);
@@ -578,17 +773,19 @@
       nettoyage.push(function () { clearTimeout(tm); });
     }
 
-    majHeros(heros, 0);
+    construire();
     majBouton();
     // La première barre part quand l'œuvre du héros est affichée (connexion lente : on ne la saute pas)
-    var imH = $('[data-h="img"]', hero);
+    var imH = imgDe(heros);
     Promise.resolve(imH && imH.decode ? imH.decode().catch(noop) : null).then(function () { if (!quitte) lancer(); });
     return {
       quitter: function () {
         quitte = true;
         if (st.anim) st.anim.cancel();
         if (rafPos) cancelAnimationFrame(rafPos);
-        jetonHeros++;
+        cartJeton++;
+        clearTimeout(fileT); clearTimeout(repriseT); file = [];
+        Object.keys(departs).forEach(function (n) { clearTimeout(departs[n]); });
         nettoyage.forEach(function (f) { f(); });
       },
       // ← → quand le héros est visible (ordinateur) : premier geste, donc arrêt du défilement
@@ -752,12 +949,16 @@
         '</div>' +
         '<div class="fi">' +
           '<div class="fi-media">' +
-            '<div class="fi-mur"><button type="button" class="fi-zoom" data-zoom aria-label="Voir l\'œuvre en grand"><img src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="(min-width: 760px) 490px, 82vw" alt="' + esc(alt(o)) + ', vue entière" width="' + o.w + '" height="' + o.h + '" fetchpriority="high" style="--r:' + ratio(o).toFixed(4) + '"></button></div>' +
-            '<div class="fi-vues">' +
-              '<button type="button" class="vue1" data-zoom aria-pressed="true" aria-label="Vue entière de l\'œuvre"><img src="' + vignette(o) + '" alt="" width="' + o.w + '" height="' + o.h + '"></button>' +
-              '<div class="vue-ph"><span class="d-only">[Photo de détail ' + cp.detail + ']</span><span class="m-only">[Détail]</span></div>' +
-              '<div class="vue-ph"><span class="d-only">[Photo de la signature]</span><span class="m-only">[Signature]</span></div>' +
-              '<div class="vue-ph"><span class="d-only">[Vue à l\'échelle, quand les dimensions seront connues]</span><span class="m-only">[Vue à l\'échelle]</span></div>' +
+            '<div class="fi-mur" data-vue="oeuvre" style="--r:' + ratio(o).toFixed(4) + '">' +
+              '<button type="button" class="fi-zoom" data-zoom aria-label="Voir l\'œuvre en grand"><img src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="(min-width: 760px) 490px, 82vw" alt="' + esc(alt(o)) + ', vue entière" width="' + o.w + '" height="' + o.h + '" fetchpriority="high"></button>' +
+              // Vue simulée en grand (détail, signature, échelle), posée au clic sur une vignette
+              '<div class="fi-sim" aria-live="polite"></div>' +
+            '</div>' +
+            '<div class="fi-vues" role="group" aria-label="Vues de l\'œuvre">' +
+              '<button type="button" class="vue-b vue1" data-vue="oeuvre" aria-pressed="true" aria-label="Vue entière de l\'œuvre"><img src="' + vignette(o) + '" alt="" width="' + o.w + '" height="' + o.h + '"></button>' +
+              ['detail', 'signature', 'echelle'].map(function (t) {
+                return '<button type="button" class="vue-b vue-sim' + (ctoHaut(o, t) ? ' cto-haut' : '') + '" data-vue="' + t + '" aria-pressed="false">' + simHtml(o, t, false) + cartouche(o, t, false) + '</button>';
+              }).join('') +
             '</div>' +
           '</div>' +
           '<div class="fi-info">' +
@@ -800,6 +1001,21 @@
       apres: function () {
         justifier($('#autres-liste'), autres, nAutres);
         $$('[data-zoom]', main).forEach(function (b) { b.addEventListener('click', function () { ouvrirVisio(o, b); }); });
+        // Vignettes : la vue choisie s'affiche en grand dans le cadre (la première ramène l'œuvre entière)
+        var mur = $('.fi-mur', main), sim = $('.fi-sim', main);
+        $$('[data-vue]', $('.fi-vues', main)).forEach(function (b) {
+          b.addEventListener('click', function () {
+            var t = b.dataset.vue;
+            if (mur.dataset.vue === t) return;
+            $$('[data-vue]', $('.fi-vues', main)).forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+            if (t !== 'oeuvre') {
+              sim.innerHTML = simHtml(o, t, true) + cartouche(o, t, true);
+              // D'une vue simulée à l'autre : la nouvelle apparaît en fondu
+              if (mur.dataset.vue !== 'oeuvre' && !reduit() && sim.animate) sim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: E_UI });
+            }
+            mur.dataset.vue = t;
+          });
+        });
         $$('[data-demande]', main).forEach(function (b) {
           b.addEventListener('click', function () { if (form$) form$.ouvrir(o.n, b.dataset.demande); });
         });
@@ -839,7 +1055,7 @@
   function pageAPropos() {
     var oc = PAR_N[OEUVRE_APROPOS] || LISTE[0];
     var photo = function (src, w, h, a, legende) {
-      return '<figure class="ap-r-f"><img src="img/' + src + '" alt="' + a + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" data-rv="clip"><figcaption>' + legende + '</figcaption></figure>';
+      return '<figure class="ap-r-f"><img src="img/' + src + '" alt="' + a + '" width="' + w + '" height="' + h + '" loading="lazy" decoding="async" data-rv="clip">' + (legende ? '<figcaption>' + legende + '</figcaption>' : '') + '</figure>';
     };
     var html =
       '<div class="wrap">' +
@@ -877,7 +1093,7 @@
           '</div>' +
           '<div class="ap-r">' +
             '<div class="ap-r-t"><h2 data-rv>Le bois</h2><p><span class="ph">[Quelques lignes d\'Armel sur la sculpture sur bois, à écrire avec lui.]</span></p></div>' +
-            photo('atelier-bois.jpg', 1080, 1080, 'Armel Promeneur travaillant le bois dehors, dans un jardin', 'Le bois, travaillé dehors') +
+            photo('atelier-bois.jpg', 1080, 1080, 'Armel Promeneur travaillant le bois dehors, dans un jardin', '') +
           '</div>' +
           '<div class="ap-r ap-r-expo">' +
             photo('exposition-minoterie.jpg', 1080, 1294, 'Une œuvre d\'Armel Promeneur accrochée au mur d\'une salle', 'Accrochage <span class="ph">[lieu et date à fournir]</span>') +
@@ -925,14 +1141,14 @@
                 '<div><p class="mono">Contact</p><p><span class="ph">[e-mail à fournir]</span><br>Instagram <a href="' + INSTA + '" target="_blank" rel="noopener">@promeneur_armel_studio</a></p></div>' +
               '</div>' +
               '<h3>Registre du commerce</h3>' +
-              '<p><span class="ph">[Aucune inscription trouvée sur Zefix : indiquer le numéro IDE s\'il existe, sinon retirer ce paragraphe.]</span></p>' +
+              '<p><span class="ph">[Aucune inscription trouvée sur Zefix&#8239;: indiquer le numéro IDE s\'il existe, sinon retirer ce paragraphe.]</span></p>' +
               '<h3>Conception du site</h3>' +
               '<p>CyberActivities, Dylan Borcard, Fribourg.</p>' +
               '<h3>Droits d\'auteur</h3>' +
               '<p>Les œuvres, les photos et les textes de ce site appartiennent à Armel Promeneur, sauf mention contraire <span class="ph">[auteur des photos à confirmer]</span>. Leur reproduction demande son accord écrit.</p>' +
               '<h3>Prix et vente</h3>' +
-              '<p><span class="ph">[Si les œuvres se vendent par le site :]</span> les prix sont indiqués en francs suisses (CHF) et sont les prix effectivement à payer&#8239;; les frais de livraison <span class="ph">[sont indiqués avant la commande]</span>. La disponibilité d\'une œuvre unique vous est confirmée à la commande.</p>' +
-              '<p><span class="ph">[Conditions de vente : lien vers la page CGV, à rédiger.]</span></p>' +
+              '<p><span class="ph">[Si les œuvres se vendent par le site&#8239;:]</span> les prix sont indiqués en francs suisses (CHF) et sont les prix effectivement à payer&#8239;; les frais de livraison <span class="ph">[sont indiqués avant la commande]</span>. La disponibilité d\'une œuvre unique vous est confirmée à la commande.</p>' +
+              '<p><span class="ph">[Conditions de vente&#8239;: lien vers la page CGV, à rédiger.]</span></p>' +
               '<h3>Responsabilité</h3>' +
               '<p>Les informations de ce site sont soignées et tenues à jour, mais des erreurs restent possibles. Le lien vers Instagram mène à un autre site, dont le contenu ne dépend pas d\'Armel Promeneur.</p>' +
             '</section>' +
@@ -943,13 +1159,13 @@
               '<p>Armel Promeneur, <span class="ph">[adresse postale à fournir]</span>, <span class="ph">[e-mail à fournir]</span>.</p>' +
               '<h3>Quelles données, et pourquoi&#8239;?</h3>' +
               '<ul>' +
-                '<li><strong>Formulaire de contact :</strong> votre nom, votre e-mail, votre téléphone si vous le donnez, l\'œuvre qui vous intéresse et votre message. Ils servent à vous répondre.</li>' +
-                '<li><strong>Achat d\'une œuvre</strong> <span class="ph">[si la vente passe par le site]</span> : en plus, votre adresse de livraison et les données de la commande, pour vous livrer et établir la facture. <span class="ph">[Moyen de paiement à définir : s\'il passe par un prestataire, le nommer ici.]</span></li>' +
-                '<li><strong>Visite du site :</strong> comme tout site, le serveur enregistre des données techniques (adresse IP, date et heure, page consultée, type de navigateur). Elles servent seulement à faire fonctionner le site et à le protéger contre les abus.</li>' +
+                '<li><strong>Formulaire de contact&#8239;:</strong> votre nom, votre e-mail, votre téléphone si vous le donnez, l\'œuvre qui vous intéresse et votre message. Ils servent à vous répondre.</li>' +
+                '<li><strong>Achat d\'une œuvre</strong> <span class="ph">[si la vente passe par le site]</span>&#8239;: en plus, votre adresse de livraison et les données de la commande, pour vous livrer et établir la facture. <span class="ph">[Moyen de paiement à définir&#8239;: s\'il passe par un prestataire, le nommer ici.]</span></li>' +
+                '<li><strong>Visite du site&#8239;:</strong> comme tout site, le serveur enregistre des données techniques (adresse IP, date et heure, page consultée, type de navigateur). Elles servent seulement à faire fonctionner le site et à le protéger contre les abus.</li>' +
               '</ul>' +
               '<p>Vos données ne servent pas à de la publicité et ne sont pas vendues.</p>' +
               '<h3>Cookies et outils de suivi</h3>' +
-              '<p>Ce site n\'utilise ni cookie publicitaire, ni outil de mesure d\'audience, ni bouton de réseau social. <span class="ph">[Si la vente passe par le site : seuls des cookies techniques, nécessaires au panier et au paiement.]</span> <span class="ph">[Les polices d\'écriture sont hébergées sur le serveur du site.]</span> Le lien Instagram n\'ouvre Instagram que si vous cliquez : Meta traite alors vos données selon ses propres règles.</p>' +
+              '<p>Ce site n\'utilise ni cookie publicitaire, ni outil de mesure d\'audience, ni bouton de réseau social. <span class="ph">[Si la vente passe par le site&#8239;: seuls des cookies techniques, nécessaires au panier et au paiement.]</span> <span class="ph">[Les polices d\'écriture sont hébergées sur le serveur du site.]</span> Le lien Instagram n\'ouvre Instagram que si vous cliquez&#8239;: Meta traite alors vos données selon ses propres règles.</p>' +
               '<h3>Qui reçoit vos données&#8239;?</h3>' +
               '<ul>' +
                 '<li><strong>Armel Promeneur,</strong> qui lit vos messages et y répond.</li>' +
@@ -959,11 +1175,11 @@
                 '<li><strong>Les autorités,</strong> seulement lorsque la loi l\'exige.</li>' +
               '</ul>' +
               '<h3>Données envoyées à l\'étranger</h3>' +
-              '<p><span class="ph">[À compléter quand les prestataires seront choisis : si l\'un d\'eux traite des données hors de Suisse, le nommer avec le pays et la garantie prévue (par exemple Stripe : Irlande et États-Unis, Swiss-U.S. Data Privacy Framework, à vérifier avant la mise en ligne). Pour une livraison hors de Suisse, l\'adresse est transmise au transporteur et aux douanes du pays de destination.]</span></p>' +
+              '<p><span class="ph">[À compléter quand les prestataires seront choisis&#8239;: si l\'un d\'eux traite des données hors de Suisse, le nommer avec le pays et la garantie prévue (par exemple Stripe&#8239;: Irlande et États-Unis, Swiss-U.S. Data Privacy Framework, à vérifier avant la mise en ligne). Pour une livraison hors de Suisse, l\'adresse est transmise au transporteur et aux douanes du pays de destination.]</span></p>' +
               '<h3>Combien de temps&#8239;?</h3>' +
               '<ul>' +
                 '<li>Les messages sont effacés quand ils ne servent plus à vous répondre ni à suivre une vente.</li>' +
-                '<li><span class="ph">[Si Armel établit des factures :]</span> les factures et les pièces comptables sont conservées 10 ans, comme la loi l\'exige.</li>' +
+                '<li><span class="ph">[Si Armel établit des factures&#8239;:]</span> les factures et les pièces comptables sont conservées 10 ans, comme la loi l\'exige.</li>' +
                 '<li>Les données techniques des visites sont effacées après <span class="ph">[durée fixée par l\'hébergeur, par exemple 30 jours]</span>.</li>' +
               '</ul>' +
               '<h3>Sécurité</h3>' +
@@ -1144,7 +1360,7 @@
     var a = ev.target.closest && ev.target.closest('a[href^="#/oeuvre/"]');
     if (!a) { dernierClic = null; return; }
     var img = a.querySelector('img');
-    if (!img && a.closest('.hero-d')) img = $('[data-h="img"]', main);
+    if (!img && a.closest('.hero-d')) img = $('.ca-it.centre img', main);
     if (!img && a.closest('.cartel-m')) img = $('.r-it[href="' + a.getAttribute('href') + '"] img', main);
     dernierClic = { href: a.getAttribute('href'), img: img, t: Date.now() };
   }, true);
@@ -1176,7 +1392,7 @@
     var source = null, retourN = null;
     if (type === 'filtre') nommerCartes(true);
     else if (r.page === 'oeuvre' && dernierClic && dernierClic.href === '#/oeuvre/' + r.oeuvre.n && Date.now() - dernierClic.t < 2000) source = dernierClic.img;
-    else if (actuel.page === 'oeuvre' && r.page !== 'oeuvre') { source = $('.fi-zoom img', main); retourN = actuel.oeuvre.n; }
+    else if (actuel.page === 'oeuvre' && r.page !== 'oeuvre') { source = $('.fi-mur[data-vue="oeuvre"] .fi-zoom img', main); retourN = actuel.oeuvre.n; }
     dernierClic = null;
     if (source && !dansFenetre(source)) source = null;
     if (source) source.style.viewTransitionName = 'oeuvre'; // un seul élément porte ce nom à la fois
