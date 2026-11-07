@@ -1,7 +1,9 @@
-/* Prototype du site d'Armel Promeneur (V3) — styles.
+/* Prototype du site d'Armel Promeneur (V4) — styles.
    Jetons repris du canevas. Une seule couleur ajoutée : le rouge de la pastille « vendue ».
    Mouvement : seulement transform, opacity et clip-path ; deux courbes pour les pages (entrée, interface).
-   Les réglages du carrousel et des boutons « verre » sont regroupés dans :root (--ca-*, --cartel-*, --fl-*). */
+   Les réglages du carrousel et des boutons ronds sont regroupés dans :root (--ca-*, --cartel-*, --fl-*).
+   L'effet verre (flou, transparence) est TOUT dans verre.css : sans ce fichier, boutons et cartouches
+   restent blancs et opaques, avec une ombre douce. */
 
 :root {
   --fond: #FAFAF8;
@@ -15,7 +17,7 @@
   --rouge: #C62828;        /* pastille des œuvres vendues (aucun texte rouge) */
   --f-titre: 'Inter Tight', 'Inter', system-ui, sans-serif;
   --f-texte: 'Inter', system-ui, sans-serif;
-  --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --f-petit: 'DM Sans', 'Inter', system-ui, sans-serif;  /* petits textes (étiquettes, fil d'Ariane, pied de page…) */
   --g: 40px;               /* marge latérale */
   --ombre: 0 1px 2px rgba(0,0,0,0.10), 0 26px 50px -18px rgba(0,0,0,0.35);
   --ombre-m: 0 1px 2px rgba(0,0,0,0.10), 0 18px 32px -12px rgba(0,0,0,0.35);
@@ -43,7 +45,7 @@
   --cartel-sortie: 220ms;
   --cartel-entree: 460ms;
   --cartel-dy: 12px;                        /* distance d'entrée */
-  /* Flèches et boutons « verre » */
+  /* Flèches rondes (accueil et fiche) et bouton Pause */
   --fl-taille: 56px;
   --fl-survol: 1.06;                        /* grossissement au survol */
   --fl-appui: .92;                          /* enfoncement à l'appui */
@@ -52,12 +54,8 @@
   --e-ressort: cubic-bezier(.34,1.56,.64,1);/* retour avec un léger rebond */
   --onde-duree: 500ms;                      /* onde qui part du bouton */
   --onde-op: .35;
-  --verre: rgba(255,255,255,.5);
-  --verre-survol: .35;                      /* voile blanc ajouté au survol (opacité) */
-  --verre-repli: rgba(250,250,248,.9);      /* sans backdrop-filter : fond plus opaque */
-  --verre-lisere: rgba(255,255,255,.75);
-  --verre-flou: blur(14px) saturate(1.4);
-  --verre-ombre: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px -10px rgba(0,0,0,.38);
+  --fl-survol-voile: .35;                   /* voile blanc ajouté au survol (opacité) */
+  --bouton-ombre: 0 1px 2px rgba(0,0,0,.08), 0 8px 22px -10px rgba(0,0,0,.30); /* ombre douce des boutons blancs */
 }
 @media (max-width: 1279px) { :root { --ca-fondu: 40px; --ca-ecart: 20px; } }  /* scène étroite : voisines plus visibles */
 @media (max-width: 759px) { :root { --g: 16px; } }
@@ -83,15 +81,15 @@ button { font-family: inherit; }
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 .phl { font-style: italic; color: var(--gris3); }
-.mono { font-family: var(--f-mono); font-size: 12px; line-height: 1.4; letter-spacing: 0; }
+.mono { font-family: var(--f-petit); font-size: 13px; font-weight: 400; line-height: 1.4; letter-spacing: .005em; }  /* nom gardé de la V3 : petits textes, en DM Sans */
 .nw { white-space: nowrap; }
 .wrap { max-width: 1440px; margin: 0 auto; padding: 0 var(--g); }
 
 /* Étiquette « exemple » des statuts et prix fictifs */
 .ex {
   display: inline-block; vertical-align: 1px; margin-left: 2px;
-  font-family: var(--f-mono); font-size: 11px; line-height: 1; font-style: normal; font-weight: 400;
-  letter-spacing: .02em; color: var(--gris3); background: var(--gris1);
+  font-family: var(--f-petit); font-size: 12.5px; line-height: 1; font-style: normal; font-weight: 500;
+  letter-spacing: .01em; color: var(--gris3); background: var(--gris1);
   border: 1px solid var(--filet); border-radius: 2px; padding: 2px 5px; white-space: nowrap;
 }
 /* Pastille rouge « vendue » (code des galeries) : le mot reste écrit en encre */
@@ -116,24 +114,33 @@ html.bloque, html.bloque body { overflow: hidden; }
 
 /* Ordinateur / téléphone : textes propres à chaque maquette */
 @media (min-width: 760px) { .m-only { display: none !important; } }
-@media (max-width: 759px) { .d-only { display: none !important; } .mono { font-size: 11px; } }
+@media (max-width: 759px) { .d-only { display: none !important; } .mono { font-size: 12.5px; } }
 
-/* ---------- Bandeau prototype ---------- */
-.proto { background: var(--gris1); color: var(--gris3); border-bottom: 1px solid var(--filet); }
+/* ---------- Bandeau prototype : fond encre, texte blanc (V4) ---------- */
+.proto { background: var(--noir); color: #fff; }
 .proto[hidden] { display: none; }
 .proto-in {
-  max-width: 1440px; margin: 0 auto; padding: 7px var(--g);
+  max-width: 1440px; margin: 0 auto; padding: 9px var(--g);
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
 }
-.proto p { font-size: 12.5px; line-height: 1.35; }
+.proto p { font-family: var(--f-petit); font-size: 13px; font-weight: 400; line-height: 1.4; }
+.proto-msg {
+  display: inline; margin: 0 0 0 6px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 500 13px/1.4 var(--f-petit); color: #fff; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap;
+}
+.proto-msg { position: relative; }
+.proto-msg::after { content: ""; position: absolute; inset: -12px -4px; }  /* zone de clic plus grande, sans changer la ligne */
+.proto-msg:hover { text-decoration-thickness: 2px; }
 .proto-x {
   flex: none; width: 44px; height: 44px; margin: -12px -12px -12px 0;
-  border: 0; background: transparent; color: var(--gris3); font-size: 20px; line-height: 1; cursor: pointer;
+  border: 0; background: transparent; color: #fff; font-size: 20px; line-height: 1; cursor: pointer;
 }
-.proto-x:hover { color: var(--noir); }
+.proto-x:hover { color: var(--filet); }
+.proto :focus-visible { outline-color: #fff; }
 @media (max-width: 759px) {
-  .proto-in { padding-top: 4px; padding-bottom: 4px; gap: 8px; }
-  .proto p { font-size: 12px; line-height: 1.3; }
+  .proto-in { padding-top: 7px; padding-bottom: 7px; gap: 8px; }
+  .proto p, .proto-msg { font-size: 12.5px; line-height: 1.35; }
+  .proto-msg { margin-left: 4px; }
   .proto-x { margin: -14px -14px -14px 0; }
 }
 
@@ -154,7 +161,7 @@ html.bloque, html.bloque body { overflow: hidden; }
 }
 .hd-nav a:last-child { padding-right: 0; }
 .hd-nav a:hover { background: var(--gris1); color: var(--noir); }
-.hd-nav .mono { font-size: 11px; color: var(--gris5); }
+.hd-nav .mono { font-size: 12.5px; color: var(--gris5); }
 .hd-nav a[aria-current="page"] { box-shadow: inset 0 -3px 0 var(--noir); }
 @media (max-width: 1023px) { .hd-sous { display: none; } }
 
@@ -194,8 +201,15 @@ html.bloque, html.bloque body { overflow: hidden; }
 .menu-nav a[aria-current="page"] .t { box-shadow: inset 0 -3px 0 var(--noir); }
 @keyframes apparition { from { opacity: 0; } to { opacity: 1; } }
 
-/* ---------- Pied de page légal : petit, gris, en mono ---------- */
-.pied { max-width: 1440px; margin: 0 auto; padding: 0 var(--g); }
+/* ---------- Pied de page tout en bas, même sur une page courte (V4) ---------- */
+body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; }
+main { flex: 1 0 auto; }
+/* Contact : le bloc d'appel (fond « mur ») descend jusqu'au pied de page */
+[data-page="contact"] main { display: flex; flex-direction: column; }
+[data-page="contact"] .appel { flex: 1 0 auto; }
+
+/* ---------- Pied de page légal : petit, gris ---------- */
+.pied { width: 100%; max-width: 1440px; margin: 0 auto; padding: 0 var(--g); }
 .ft { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; padding: 18px 0 28px; color: var(--gris5); }
 [data-appel="0"] .ft { border-top: 1px solid var(--filet); }
 .ft a { color: var(--gris5); }
@@ -267,40 +281,41 @@ html.bloque, html.bloque body { overflow: hidden; }
   .ca.reprise .ca-it.vois:hover { transition-timing-function: var(--ca-courbe-reprise), var(--e-ui); }
 }
 
-/* Flèches « verre » : posées sur les voisines, fond translucide flouté, fin liseré clair */
+/* Flèches rondes (accueil et fiche, même composant) : boutons blancs avec ombre douce ;
+   verre.css les rend translucides et floutées */
 .fleche {
-  position: absolute; z-index: 3; top: calc(var(--hh) / 2); margin-top: calc(var(--fl-taille) / -2);
+  position: absolute; z-index: 3; margin-top: calc(var(--fl-taille) / -2);
   display: inline-flex; align-items: center; justify-content: center;
   width: var(--fl-taille); height: var(--fl-taille); padding: 0;
-  border: 1px solid var(--verre-lisere); border-radius: 50%;
-  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
-  box-shadow: var(--verre-ombre); color: var(--noir); cursor: pointer;
+  border: 1px solid rgba(17,17,17,.08); border-radius: 50%;
+  background: #fff; box-shadow: var(--bouton-ombre); color: var(--noir); cursor: pointer; text-decoration: none;
   transition: transform var(--fl-retour-duree) var(--e-ressort);
   -webkit-tap-highlight-color: transparent;
 }
-/* Au milieu de la partie visible des voisines (même place pour toutes les œuvres) */
-.fleche-p { left: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
-.fleche-s { right: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
+.fleche:hover { color: var(--noir); }
+/* Accueil : au milieu de la partie visible des voisines (même place pour toutes les œuvres) */
+.scene .fleche { top: calc(var(--hh) / 2); }
+.scene .fleche-p { left: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
+.scene .fleche-s { right: calc((100cqw - var(--ca-cap, min(474px, 100cqw - 290px))) / 4 - var(--fl-taille) / 2); }
 .fleche::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #fff; opacity: 0; transition: opacity .3s var(--e-ui); }
 .fl-ic { position: relative; display: block; transition: transform .35s var(--e-ui); }
 .fl-ic svg { display: block; }
 .onde { position: absolute; inset: -1px; border-radius: 50%; border: 1.5px solid var(--noir); opacity: 0; pointer-events: none; }
 @media (hover: hover) {
   .fleche:hover { transform: scale(var(--fl-survol)); }
-  .fleche:hover::before { opacity: var(--verre-survol); }
+  .fleche:hover::before { opacity: var(--fl-survol-voile); }
   .fleche-p:hover .fl-ic { transform: translateX(-3px); }
   .fleche-s:hover .fl-ic { transform: translateX(3px); }
 }
 /* Appui : le bouton s'enfonce vite, puis revient avec un léger rebond (transition de base) */
 .fleche.appuye { transform: scale(var(--fl-appui)); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
-.fleche:focus-visible { outline: 2px solid var(--noir); outline-offset: 4px; box-shadow: var(--verre-ombre), 0 0 0 4px rgba(255,255,255,.9); }  /* halo blanc : visible aussi sur une œuvre sombre */
+.fleche:focus-visible { outline: 2px solid var(--noir); outline-offset: 4px; box-shadow: var(--bouton-ombre), 0 0 0 4px rgba(255,255,255,.9); }  /* halo blanc : visible aussi sur une œuvre sombre */
 
-/* Lecture : pilule verre plus petite, bouton Pause étiqueté et barre qui se remplit en 6 s */
+/* Lecture : petite pilule blanche (verre avec verre.css), bouton Pause étiqueté et barre qui se remplit en 6 s */
 .hero-ctl {
   position: relative; display: flex; align-items: center; gap: 12px; width: 272px; margin: 22px auto 0; padding: 0 18px 0 0;
-  border: 1px solid var(--verre-lisere); border-radius: 23px;
-  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
-  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 20px -12px rgba(0,0,0,.3);
+  border: 1px solid rgba(17,17,17,.08); border-radius: 23px;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 20px -12px rgba(0,0,0,.3);
 }
 .hero-ctl[hidden] { display: none; }
 .pause {
@@ -309,7 +324,7 @@ html.bloque, html.bloque body { overflow: hidden; }
   font: 500 13.5px var(--f-texte); color: var(--noir); cursor: pointer;
   transition: transform var(--fl-retour-duree) var(--e-ressort); -webkit-tap-highlight-color: transparent;
 }
-.pause::before { content: ""; position: absolute; inset: 4px; border-radius: 18px; background: #fff; opacity: 0; transition: opacity .3s var(--e-ui); }
+.pause::before { content: ""; position: absolute; inset: 4px; border-radius: 18px; background: var(--gris1); opacity: 0; transition: opacity .3s var(--e-ui); }
 .pause > span { position: relative; }
 @media (hover: hover) { .pause:hover::before { opacity: .75; } }
 .pause.appuye { transform: scale(.95); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
@@ -319,10 +334,6 @@ html.bloque, html.bloque body { overflow: hidden; }
 .pause[data-etat="pause"] .pause-ic { width: 0; height: 0; border-style: solid; border-width: 6px 0 6px 10px; border-color: transparent transparent transparent currentColor; }
 .piste { flex: 1 1 auto; height: 2px; border-radius: 1px; background: rgba(17,17,17,.14); overflow: hidden; }
 .piste-r { display: block; height: 100%; background: var(--noir); transform: scaleX(0); transform-origin: left center; }
-/* Navigateur sans flou d'arrière-plan : fond plus opaque */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .fleche, .hero-ctl { background: var(--verre-repli); }
-}
 
 /* Cartel */
 .cartel { width: 100%; max-width: 280px; border-top: 1px solid var(--filet); padding-top: 16px; }
@@ -536,7 +547,7 @@ html.bloque, html.bloque body { overflow: hidden; }
   padding: 12px; border-bottom: 1px solid var(--filet); text-decoration: none; color: var(--noir); font-size: 14px;
 }
 a.ligne:hover { color: var(--noir); }
-.ligne-hd { font-size: 11px; color: var(--gris5); padding-top: 16px; padding-bottom: 12px; }
+.ligne-hd { font-size: 12.5px; color: var(--gris5); padding-top: 16px; padding-bottom: 12px; }
 .l-n { font-size: 13px; color: var(--gris5); }
 .vign { width: 72px; height: 88px; background: var(--gris1); display: flex; align-items: center; justify-content: center; }
 .vign img { display: block; max-width: 72px; max-height: 88px; width: auto; height: auto; }
@@ -585,17 +596,21 @@ a.ligne:hover .l-fl, a.ligne.actif .l-fl, a.ligne:focus-visible .l-fl { opacity:
 .fil a { color: var(--gris5); text-decoration: none; }
 .fil a:hover { color: var(--noir); }
 .fil [aria-current] { color: var(--noir); }
-.fi-pn { display: flex; align-items: center; gap: 28px; font-weight: 500; }
-.fi-pn a { text-decoration: none; color: var(--noir); }
 .fi { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 40px 96px; padding: 32px 0 96px; }
 .fi-media { flex: 999 1 640px; min-width: 0; }
 .fi-mur {
   height: clamp(520px, calc(100svh - 60px), 860px); padding: 64px; background: var(--mur);
   display: flex; align-items: center; justify-content: center; container-type: size;
+  --fi-px: 64px;  /* marge de côté du cadre (pour placer les flèches) */
 }
 .fi-zoom { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .fi-zoom img { display: block; width: min(490px, 100cqw, calc(100cqh * var(--r))); height: auto; box-shadow: var(--ombre); }
 .fi-vues { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+/* Flèches de la fiche : au milieu de l'espace libre à côté de l'œuvre (sur le bord de l'image s'il manque de place) */
+.fi-mur { touch-action: pan-y pinch-zoom; }  /* glisser à gauche / à droite sur l'image (téléphone) */
+.fi-mur .fleche { top: 50%; --fi-iw: min(490px, 100cqw); }  /* largeur max du cadre : même place des flèches pour toutes les œuvres */
+.fi-mur .fleche-p { left: max(6px, calc((var(--fi-px) + (100cqw - var(--fi-iw)) / 2) / 2 - var(--fl-taille) / 2)); }
+.fi-mur .fleche-s { right: max(6px, calc((var(--fi-px) + (100cqw - var(--fi-iw)) / 2) / 2 - var(--fl-taille) / 2)); }
 /* Cadre principal : l'œuvre entière, ou la vue simulée choisie (fondu de l'une à l'autre) */
 .fi-mur { position: relative; }
 .fi-zoom { transition: opacity .35s var(--e-ui), visibility 0s; }
@@ -635,12 +650,11 @@ a.ligne:hover .l-fl, a.ligne.actif .l-fl, a.ligne:focus-visible .l-fl { opacity:
 .vue-sim .sim-sol { top: 45%; }
 /* En grand : détail et signature à la place de l'œuvre, échelle sur tout le mur */
 .fi-sim .sim-zoom { position: relative; inset: auto; width: min(490px, 100cqw, calc(100cqh * var(--r))); aspect-ratio: var(--r); box-shadow: var(--ombre); }
-/* Cartouche « verre » : garde le libellé et dit toujours que c'est une simulation */
+/* Cartouche blanc (verre avec verre.css) : garde le libellé et dit toujours que c'est une simulation */
 .cto {
   position: absolute; left: 6px; right: 6px; top: 6px; display: block; padding: 6px 8px 7px; margin: 0;
-  border: 1px solid var(--verre-lisere); border-radius: 8px;
-  background: rgba(255,255,255,.66); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
-  box-shadow: 0 6px 16px -8px rgba(0,0,0,.35); color: var(--gris3);
+  border: 1px solid rgba(17,17,17,.08); border-radius: 8px;
+  background: #fff; box-shadow: 0 6px 16px -8px rgba(0,0,0,.35); color: var(--gris3);
 }
 .cto-lib { display: block; font-size: 11.5px; line-height: 1.3; font-style: italic; }
 .cto-note { display: block; margin-top: 3px; font-size: 10.5px; line-height: 1.3; color: var(--gris5); }
@@ -648,19 +662,18 @@ a.ligne:hover .l-fl, a.ligne.actif .l-fl, a.ligne:focus-visible .l-fl { opacity:
 .cto.grand { left: 16px; right: auto; top: auto; bottom: 16px; max-width: min(380px, calc(100% - 32px)); padding: 12px 15px 13px; border-radius: 12px; }
 .cto.grand .cto-lib { font-size: 14px; }
 .cto.grand .cto-note { margin-top: 5px; font-size: 13px; }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .cto { background: var(--verre-repli); } }
 .fi-info { flex: 1 1 340px; max-width: 440px; position: sticky; top: 24px; }
 .fi-k { color: var(--gris5); }
 .fi-info h1 { margin: 14px 0 12px; font-family: var(--f-titre); font-weight: 500; font-size: 44px; line-height: 1.1; letter-spacing: -0.02em; }
 .fi-tab { width: 100%; margin-top: 32px; border-collapse: collapse; font-size: 13px; }
 .fi-tab tr { border-top: 1px solid var(--filet); }
 .fi-tab tr:last-child { border-bottom: 1px solid var(--filet); }
-.fi-tab th { width: 34%; padding: 9px 12px 9px 0; font-family: var(--f-mono); font-size: 11px; line-height: 1.4; font-weight: 400; color: var(--gris5); text-align: left; vertical-align: top; }
+.fi-tab th { width: 34%; padding: 9px 12px 9px 0; font-family: var(--f-petit); font-size: 12.5px; line-height: 1.4; font-weight: 400; color: var(--gris5); text-align: left; vertical-align: top; }
 .fi-tab td { padding: 8px 0; }
 .fi-prix { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 34px; padding: 18px 0 4px; border-top: 1px solid var(--noir); }
 .fi-prix .mono { color: var(--gris5); }
 .fi-prix-v { font-family: var(--f-titre); font-weight: 500; font-size: 30px; letter-spacing: -0.02em; text-align: right; }
-.fi-prix-v .ex { font-family: var(--f-mono); font-size: 11px; letter-spacing: .02em; }
+.fi-prix-v .ex { font-family: var(--f-petit); font-size: 12.5px; letter-spacing: .01em; }
 .fi-prix-v .pastille { width: .5em; height: .5em; vertical-align: .08em; }
 .fi-note { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .fi-note .ex { margin: 0 0 0 auto; }
@@ -699,10 +712,10 @@ details[open] .plus::before { content: "−"; }
 @media (max-width: 759px) {
   .fi-barre { min-height: 48px; padding: 0; border: 0; font-size: 14px; font-weight: 500; }
   .fi-retour { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
-  .fi-pn { gap: 6px; }
-  .fi-pn a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
   .fi { gap: 28px; padding: 0; }
-  .fi-mur { height: 440px; padding: 33px 24px; }
+  .fi-mur { height: 440px; padding: 33px 24px; --fi-px: 24px; --fl-taille: 44px; }
+  .fi-mur .fleche-p { left: 4px; }   /* téléphone : sur les bords de l'image */
+  .fi-mur .fleche-s { right: 4px; }
   .fi-zoom img { box-shadow: var(--ombre-m); }
   .fi-vues { gap: 8px; margin-top: 8px; }
   .vue-b { height: 84px; }
@@ -754,10 +767,13 @@ details[open] .plus::before { content: "−"; }
 .tab { width: 100%; border-collapse: collapse; font-size: 15px; }
 .tab tr { border-top: 1px solid var(--filet); }
 .tab tr:last-child { border-bottom: 1px solid var(--filet); }
-.tab th { width: 34%; padding: 11px 12px 11px 0; font-family: var(--f-mono); font-size: 12px; line-height: 1.4; font-weight: 400; color: var(--gris5); text-align: left; vertical-align: top; }
+.tab th { width: 34%; padding: 11px 12px 11px 0; font-family: var(--f-petit); font-size: 13px; line-height: 1.4; font-weight: 400; color: var(--gris5); text-align: left; vertical-align: top; }
 .tab td { padding: 9px 0; }
 .tab a, .ct-dl a { text-decoration: none; color: var(--noir); font-weight: 500; }
 @media (max-width: 759px) { .tab a, .ct-dl a { display: inline-block; padding: 12px 0; margin: -12px 0; } }
+/* Lien Instagram : petit logo dessiné (couleur du texte) devant « @promeneur_armel_studio ↗ » */
+a.ig { display: inline-flex; align-items: center; gap: 8px; }
+.ig-logo { flex: none; display: block; width: 16px; height: 16px; }
 .ap-bio { margin-top: 36px; font-size: 17px; line-height: 1.6; }
 /* Citation en grand */
 .ap-cit { padding: 88px 0 104px; border-top: 1px solid var(--noir); }
@@ -939,6 +955,41 @@ details[open] .plus::before { content: "−"; }
 .introuv .lien-s { display: inline-block; margin-top: 28px; font-size: 15px; }
 @media (max-width: 759px) { .introuv .lien-s { padding-top: 20px; margin-top: 8px; } } /* cible tactile de 44 px, même trait sous le texte */
 
+/* ---------- Message d'accueil : fenêtre au milieu de l'écran (V4) ---------- */
+/* La fenêtre couvre l'écran (fond assombri) ; la carte est centrée. Animations faites par app.js
+   (transform et opacity) ; sans verre.css : carte blanche, fond assombri sans flou. */
+.msg {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+  margin: 0; padding: 16px; border: 0; background: transparent; color: var(--noir);
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.msg[open] { display: grid; place-items: center; }
+.msg::backdrop { background: transparent; }
+.msg-fond { position: fixed; inset: 0; background: rgba(17,17,17,.5); }
+.msg-carte {
+  position: relative; width: 100%; max-width: 460px; padding: 36px 36px 28px;
+  border-radius: 20px; background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12), 0 40px 80px -30px rgba(0,0,0,.6);
+  font-size: 17px; line-height: 1.55;
+}
+.msg-titre { margin-bottom: 18px; font-family: var(--f-titre); font-weight: 600; font-size: 30px; line-height: 1.15; letter-spacing: -0.02em; }
+/* Émoji natif (style Apple sur iPhone et Mac) */
+.msg-emoji { display: inline-block; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-weight: 400; transform-origin: 60% 80%; }
+.msg-carte p + p { margin-top: 12px; }
+.msg-carte .msg-sig { margin-top: 22px; font: 500 13px/1.4 var(--f-petit); color: var(--gris5); }
+.msg-ok {
+  display: block; width: 100%; height: 52px; margin-top: 26px; padding: 0;
+  border: 0; border-radius: 12px; background: var(--noir); color: #fff; font: 600 16px var(--f-texte); cursor: pointer;
+  transition: transform var(--fl-retour-duree) var(--e-ressort); -webkit-tap-highlight-color: transparent;
+}
+.msg-ok:hover { background: var(--gris3); }
+.msg-ok.appuye { transform: scale(.95); transition-duration: var(--fl-appui-duree); transition-timing-function: var(--e-ui); }
+.msg-ok:focus-visible { outline: 2px solid var(--noir); outline-offset: 3px; }
+@media (max-width: 759px) {
+  .msg-carte { padding: 28px 22px 20px; border-radius: 18px; font-size: 16px; }
+  .msg-titre { font-size: 26px; margin-bottom: 14px; }
+}
+
 /* ---------- Apparitions au défilement (posées par app.js, une seule fois) ---------- */
 /* Titres et images seulement : 600 ms, courbe d'entrée, 70 ms de décalage */
 .rv[data-rv=""] { opacity: 0; transform: translateY(16px); }
@@ -962,7 +1013,21 @@ details[open] .plus::before { content: "−"; }
 /* Filtres de la galerie : les cartes glissent vers leur nouvelle place, 350 ms */
 html[data-vt="filtre"]::view-transition-old(root),
 html[data-vt="filtre"]::view-transition-new(root) { animation: none; }
+/* Fiche → fiche : la page ne fait pas de fondu (en-tête, mur et flèches restent nets) ; seules l'œuvre et les infos glissent */
+html[data-vt="fiche"]::view-transition-old(root),
+html[data-vt="fiche"]::view-transition-new(root) { animation: none; }
 html[data-vt="filtre"]::view-transition-group(*) { animation-duration: .35s; animation-timing-function: var(--e-ui); }
+/* Fiche → fiche (flèches, touches ← →, glisser) : l'œuvre et ses infos glissent dans le sens du mouvement ;
+   le cadre et les flèches restent en place. Sans View Transitions : la page change simplement. */
+::view-transition-group(fi-img), ::view-transition-group(fi-info) { animation-duration: .5s; animation-timing-function: var(--e-entree); }
+::view-transition-old(fi-img), ::view-transition-old(fi-info) { animation: vt-fiche-sortie .2s var(--e-ui) both; }
+::view-transition-new(fi-img), ::view-transition-new(fi-info) { animation: vt-fiche-entree .48s var(--e-entree) .12s both; }
+html[data-sens="-1"]::view-transition-old(fi-img), html[data-sens="-1"]::view-transition-old(fi-info) { animation-name: vt-fiche-sortie-g; }
+html[data-sens="-1"]::view-transition-new(fi-img), html[data-sens="-1"]::view-transition-new(fi-info) { animation-name: vt-fiche-entree-g; }
+@keyframes vt-fiche-sortie { to { opacity: 0; transform: translateX(-40px); } }
+@keyframes vt-fiche-entree { from { opacity: 0; transform: translateX(40px); } }
+@keyframes vt-fiche-sortie-g { to { opacity: 0; transform: translateX(40px); } }
+@keyframes vt-fiche-entree-g { from { opacity: 0; transform: translateX(-40px); } }
 
 /* ---------- Mouvements réduits : tout mouvement coupé ---------- */
 @media (prefers-reduced-motion: reduce) {

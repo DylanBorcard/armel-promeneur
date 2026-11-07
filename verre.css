@@ -1,0 +1,85 @@
+/* Effet verre du site d'Armel Promeneur (V4) : verre dépoli (fond translucide flouté, fin liseré clair).
+   TOUT l'effet est ici. Pour revenir en arrière : retirer la ligne « verre.css » de index.html ;
+   styles.css garde alors des boutons blancs opaques avec une ombre douce et des cartouches blancs.
+   Endroits : flèches (accueil et fiche), pilule Pause, cartouches des simulations, message d'accueil,
+   en-tête collant pendant le défilement, menu plein écran du téléphone.
+   Boutons noirs (« Écrire à Armel », « Acheter ») : pas de verre. */
+
+:root {
+  --verre: rgba(255,255,255,.5);
+  --verre-repli: rgba(250,250,248,.92);     /* navigateur sans flou d'arrière-plan : fond plus opaque */
+  --verre-lisere: rgba(255,255,255,.75);
+  --verre-flou: blur(14px) saturate(1.4);
+  --verre-ombre: 0 1px 2px rgba(0,0,0,.06), 0 10px 28px -10px rgba(0,0,0,.38);
+  --hd-h: 78px;                             /* hauteur de l'en-tête collant (ordinateur) */
+}
+@media (max-width: 759px) { :root { --hd-h: 76px; } }
+
+/* ---------- Flèches rondes (accueil et fiche) ---------- */
+.fleche {
+  border-color: var(--verre-lisere);
+  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+  box-shadow: var(--verre-ombre);
+}
+.fleche:focus-visible { box-shadow: var(--verre-ombre), 0 0 0 4px rgba(255,255,255,.9); }
+
+/* ---------- Pilule Pause de l'accueil ---------- */
+.hero-ctl {
+  border-color: var(--verre-lisere);
+  background: var(--verre); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+}
+.pause::before { background: #fff; }
+/* La pilule et les flèches de la fiche (ordinateur) sont posées sur le mur uni, pas sur une image :
+   verre presque opaque, pour rester blanc et net comme la version sans verre */
+.hero-ctl { background: rgba(255,255,255,.84); }
+@media (min-width: 760px) { .fi-mur .fleche { background: rgba(255,255,255,.84); } }
+
+/* ---------- Cartouches des vues simulées (fiche) ---------- */
+.cto {
+  border-color: var(--verre-lisere);
+  background: rgba(255,255,255,.66); -webkit-backdrop-filter: var(--verre-flou); backdrop-filter: var(--verre-flou);
+}
+
+/* ---------- Message d'accueil : carte de verre sombre, texte blanc, sur un fond flouté ---------- */
+.msg-fond { -webkit-backdrop-filter: blur(10px) saturate(1.1); backdrop-filter: blur(10px) saturate(1.1); }
+.msg-carte {
+  border: 1px solid rgba(255,255,255,.34);
+  background: rgba(28,28,26,.32); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 40px 80px -30px rgba(0,0,0,.6);
+  color: #fff;
+}
+.msg-carte .msg-sig { color: rgba(255,255,255,.85); }
+.msg-ok { background: #fff; color: var(--noir); }
+.msg-ok:hover { background: var(--gris1); }
+.msg-ok:focus-visible { outline-color: #fff; }
+
+/* ---------- Menu plein écran du téléphone : la page reste devinée derrière ---------- */
+.menu {
+  background: rgba(250,250,248,.74);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3);
+}
+
+/* ---------- En-tête collant : verre dépoli dès qu'on fait défiler ---------- */
+/* (Accueil sur grand écran : pas d'en-tête, le héros plein écran porte le menu.) */
+.hd { position: sticky; top: 0; z-index: 60; }
+.hd::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: rgba(250,250,248,.72); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: 0 8px 24px -18px rgba(0,0,0,.35);
+  opacity: 0; transition: opacity .25s var(--e-ui);
+}
+html.hd-colle .hd::before { opacity: 1; }
+html.hd-colle [data-page="accueil"] .hd { background: transparent; }
+[data-page="accueil"] .hd::before { background: rgba(236,235,232,.75); transition: none; }  /* teinte du mur, sans fondu */
+/* Ce qui colle ou défile vers un titre passe sous l'en-tête */
+html { scroll-padding-top: var(--hd-h); }
+html:has(body[data-page="accueil"]) { scroll-padding-top: 0; }
+@media (max-width: 1023px) { html:has(body[data-page="accueil"]) { scroll-padding-top: var(--hd-h); } }
+.fi-info, .idx-ap, .lg-aside { top: calc(var(--hd-h) + 24px); }
+
+/* ---------- Navigateur sans flou d'arrière-plan : fonds plus opaques ---------- */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .fleche, .hero-ctl, .cto, .hd::before { background: var(--verre-repli); }
+  .menu { background: var(--fond); }
+  .msg-carte { background: rgba(28,28,26,.94); }
+}

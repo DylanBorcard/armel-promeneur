@@ -10,8 +10,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23111111'/%3E%3Ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-weight='700' font-size='27' fill='%23FFFFFF' text-anchor='middle'%3EAP%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&amp;family=Inter:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&amp;family=Inter:wght@400;500;600&amp;family=DM+Sans:wght@400;500&amp;display=swap">
 <link rel="stylesheet" href="styles.css">
+<!-- Effet verre : retirer cette ligne pour revenir en arrière -->
+<link rel="stylesheet" href="verre.css">
 </head>
 <body data-page="accueil">
 
@@ -20,7 +22,7 @@
 <!-- Bandeau du prototype (choix de Dylan) -->
 <div class="proto" id="proto" role="note" aria-label="Prototype">
   <div class="proto-in">
-    <p>Prototype de travail&#8239;: statuts et prix fictifs (exemples), textes à compléter.</p>
+    <p>Prototype de travail&#8239;: statuts et prix fictifs (exemples), textes à compléter. <button type="button" class="proto-msg" id="proto-msg">Relire le message</button></p>
     <button type="button" class="proto-x" id="proto-x" aria-label="Fermer le bandeau">×</button>
   </div>
 </div>
@@ -73,6 +75,19 @@
   <button type="button" class="visio-x" id="visio-x" aria-label="Fermer la vue en grand">×</button>
   <img id="visio-img" alt="">
 </div>
+
+<!-- Message d'accueil de Dylan (texte validé par Dylan) : une fois par appareil, puis « Relire le message » -->
+<dialog class="msg" id="msg" aria-labelledby="msg-titre">
+  <div class="msg-fond" aria-hidden="true"></div>
+  <div class="msg-carte">
+    <h2 class="msg-l msg-titre" id="msg-titre">Salut Boss <span class="msg-emoji">🫡</span></h2>
+    <p class="msg-l">Ce site est une présentation de ce que je peux faire pour toi. Il ne t'engage à rien.</p>
+    <p class="msg-l">Tout n'est pas encore fonctionnel&nbsp;: les prix, les statuts et certains textes sont des exemples.</p>
+    <p class="msg-l">Si le projet t'intéresse, je peux continuer à le développer avec toi.</p>
+    <p class="msg-l msg-sig">Dylan · CyberActivities</p>
+    <button type="button" class="msg-l msg-ok" id="msg-ok" autofocus>OK</button>
+  </div>
+</dialog>
 
 <script src="data.js"></script>
 <script src="app.js"></script>

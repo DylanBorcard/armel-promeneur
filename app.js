@@ -1,4 +1,4 @@
-/* Prototype du site d'Armel Promeneur (V3) — JavaScript sans framework ni bibliothèque.
+/* Prototype du site d'Armel Promeneur (V4) — JavaScript sans framework ni bibliothèque.
    Routage par hash (#/galerie, #/oeuvre/07…), marche aussi ouvert en file://.
    Les données viennent de data.js (window.SITE). Rien n'est envoyé sur internet.
    Mouvement : seulement transform, opacity et clip-path ; tout est coupé si prefers-reduced-motion. */
@@ -120,6 +120,37 @@
     var b = el.getBoundingClientRect();
     return b.width > 0 && b.bottom > 0 && b.top < window.innerHeight && b.right > 0 && b.left < window.innerWidth;
   }
+  // Valeur d'une variable CSS en nombre (« 850ms » ou « .85s » rendent 850)
+  function reglageCss(nom, el) {
+    var v = getComputedStyle(el || document.documentElement).getPropertyValue(nom).trim(), x = parseFloat(v);
+    return /\ds$/.test(v) ? x * 1000 : x;
+  }
+  // Logo Instagram (glyphe simple, couleur du texte), devant le nom du compte
+  var IG_LOGO = '<svg class="ig-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4.1" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.4" cy="6.6" r="1.15" fill="currentColor"/></svg>';
+  function lienInsta() { return '<a class="ig" href="' + INSTA + '" target="_blank" rel="noopener">' + IG_LOGO + '<span>@promeneur_armel_studio <span aria-hidden="true">↗</span></span></a>'; }
+  // Flèche ronde (accueil et fiche) : trait fin de 1,5 px et onde qui part du bouton à l'appui
+  function flecheIc(d) {
+    return '<span class="fl-ic" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><path d="' + (d < 0 ? 'M19 7H1.5M7.5 1 1.5 7l6 6' : 'M1 7h17.5M12.5 1l6 6-6 6') + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+      '<span class="onde" aria-hidden="true"></span>';
+  }
+  // Onde qui part d'un bouton rond
+  function onde(b) {
+    var o = $('.onde', b);
+    if (!o || !o.animate || reduit()) return;
+    o.animate([{ transform: 'scale(.6)', opacity: reglageCss('--onde-op') }, { transform: 'scale(1.6)', opacity: 0 }],
+      { duration: reglageCss('--onde-duree'), easing: 'cubic-bezier(.25,.6,.4,1)' });
+  }
+  /* Boutons : enfoncement à l'appui (souris, doigt, Entrée/Espace), retour avec rebond (CSS), onde au clic.
+     ecoute(cible, type, f) permet au carrousel de tout débrancher en quittant la page. */
+  function appui(b, avecOnde, ecoute) {
+    ecoute = ecoute || function (c, t, f) { c.addEventListener(t, f); };
+    var oui = function () { b.classList.add('appuye'); };
+    var non = function () { b.classList.remove('appuye'); };
+    ecoute(b, 'pointerdown', function (e) { if (e.button === 0) oui(); });
+    ['pointerup', 'pointercancel', 'pointerleave', 'blur', 'keyup'].forEach(function (t) { ecoute(b, t, non); });
+    ecoute(b, 'keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') oui(); });
+    if (avecOnde) ecoute(b, 'click', function () { onde(b); });
+  }
 
   /* ---------- Cartes et rangées justifiées ---------- */
   function carte(o, opts) {
@@ -214,10 +245,10 @@
     var moyens = grand
       ? '<dl class="ct-dl">' +
           '<div><dt class="mono">E-mail</dt><dd><span class="ph">[adresse à fournir]</span></dd></div>' +
-          '<div><dt class="mono">Instagram</dt><dd><a href="' + INSTA + '" target="_blank" rel="noopener">@promeneur_armel_studio ↗</a></dd></div>' +
+          '<div><dt class="mono">Instagram</dt><dd>' + lienInsta() + '</dd></div>' +
           '<div><dt class="mono">Lieu</dt><dd>En Suisse, <span class="ph">[ville]</span></dd></div>' +
         '</dl>'
-      : '<p class="appel-insta"><span class="mono">Instagram</span><a href="' + INSTA + '" target="_blank" rel="noopener">@promeneur_armel_studio <span aria-hidden="true">↗</span></a></p>';
+      : '<p class="appel-insta"><span class="mono">Instagram</span>' + lienInsta() + '</p>';
     var err = function (id) { return '<span class="err" id="' + id + '-err" hidden></span>'; };
     return '<section class="appel' + (grand ? ' grand' : '') + '" id="appel" aria-labelledby="appel-titre"><div class="appel-in">' +
       '<div class="appel-g">' + titre +
@@ -334,11 +365,6 @@
     for (var k = 0; k < TOTAL; k++) rangee.push(voisin(o, k));
     var nomH1 = '<span class="hero-nom">' + lignes(['Armel', 'Promeneur']) + '</span> ' +
       '<span class="hero-sous"><span class="l"><span style="--i:2">Peintre et sculpteur</span></span></span>';
-    // Flèche fine (trait 1,5 px) et onde qui part du bouton à l'appui
-    var fleche = function (d) {
-      return '<span class="fl-ic" aria-hidden="true"><svg width="20" height="14" viewBox="0 0 20 14"><path d="' + (d < 0 ? 'M19 7H1.5M7.5 1 1.5 7l6 6' : 'M1 7h17.5M12.5 1l6 6-6 6') + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-        '<span class="onde" aria-hidden="true"></span>';
-    };
     var html =
       '<section class="hero" aria-roledescription="carrousel" aria-label="Œuvres à la une"><div class="hero-in">' +
         '<div class="hero-g">' +
@@ -355,8 +381,8 @@
           '<div class="scene">' +
             // Les œuvres (centrale, voisines, entrantes) sont posées ici par brancherCarrousel()
             '<div class="scene-in" data-h="zone"><div class="ca" data-h="ca"></div></div>' +
-            '<button type="button" class="fleche fleche-p" data-h="prec" aria-label="Œuvre précédente">' + fleche(-1) + '</button>' +
-            '<button type="button" class="fleche fleche-s" data-h="suiv" aria-label="Œuvre suivante">' + fleche(1) + '</button>' +
+            '<button type="button" class="fleche fleche-p" data-h="prec" aria-label="Œuvre précédente">' + flecheIc(-1) + '</button>' +
+            '<button type="button" class="fleche fleche-s" data-h="suiv" aria-label="Œuvre suivante">' + flecheIc(1) + '</button>' +
             '<div class="hero-ctl" data-h="ctl">' +
               '<button type="button" class="pause" data-h="pause" data-etat="lecture"><span class="pause-ic" aria-hidden="true"></span><span data-h="pause-t">Pause</span></button>' +
               '<span class="piste" aria-hidden="true"><span class="piste-r" data-h="rempli"></span></span>' +
@@ -446,11 +472,7 @@
       cible.addEventListener(type, f);
       nettoyage.push(function () { cible.removeEventListener(type, f); });
     }
-    // Valeur d'une variable CSS (« 850ms » ou « .85s » rendent 850)
-    function reglage(nom) {
-      var v = getComputedStyle(sc).getPropertyValue(nom).trim(), x = parseFloat(v);
-      return /\ds$/.test(v) ? x * 1000 : x;
-    }
+    function reglage(nom) { return reglageCss(nom, sc); }
 
     /* --- Ordinateur : les œuvres de la scène --- */
     var FEN = 2;      // œuvres gardées de chaque côté (les places ±2 sont invisibles)
@@ -606,21 +628,6 @@
       }, noop);
     }
 
-    /* --- Boutons : enfoncement à l'appui (souris, doigt, Entrée/Espace), retour avec rebond, onde --- */
-    function appui(b, onde) {
-      var oui = function () { b.classList.add('appuye'); };
-      var non = function () { b.classList.remove('appuye'); };
-      ecoute(b, 'pointerdown', function (e) { if (e.button === 0) oui(); });
-      ['pointerup', 'pointercancel', 'pointerleave', 'blur', 'keyup'].forEach(function (t) { ecoute(b, t, non); });
-      ecoute(b, 'keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') oui(); });
-      if (onde) ecoute(b, 'click', function () {
-        var o = $('.onde', b);
-        if (!o || !o.animate || reduit()) return;
-        o.animate([{ transform: 'scale(.6)', opacity: reglage('--onde-op') }, { transform: 'scale(1.6)', opacity: 0 }],
-          { duration: reglage('--onde-duree'), easing: 'cubic-bezier(.25,.6,.4,1)' });
-      });
-    }
-
     function autoPossible() { return mqOrdi.matches && !reduit(); }
     function enPause() { return st.manuel || st.survol || st.focus || st.horsVue || document.hidden || !autoPossible(); }
     function majBouton() {
@@ -678,8 +685,8 @@
 
     ecoute($('[data-h="prec"]', hero), 'click', function () { geste(-1); });
     ecoute($('[data-h="suiv"]', hero), 'click', function () { geste(1); });
-    $$('.fleche', hero).forEach(function (b) { appui(b, true); });
-    appui(btn, false);
+    $$('.fleche', hero).forEach(function (b) { appui(b, true, ecoute); });
+    appui(btn, false, ecoute);
     // Voisines : un clic les fait glisser au centre ; l'œuvre centrale mène à sa fiche
     ecoute(ca, 'click', function (e) {
       var it = e.target.closest && e.target.closest('.ca-it');
@@ -760,13 +767,17 @@
     }
     // Petit glissement d'indice, une seule fois, 1,2 s après l'arrivée
     if (!indiceFait && !reduit() && !mqOrdi.matches && items[0] && items[0].animate) {
-      var tm = setTimeout(function () {
-        indiceFait = true;
-        if (row.scrollLeft > 4) return;
-        items.slice(0, 3).forEach(function (el) {
-          el.animate([{ transform: 'translateX(0)', easing: E_UI }, { transform: 'translateX(-24px)', easing: E_UI }, { transform: 'translateX(0)' }], { duration: 800 });
-        });
-      }, 1200);
+      var tm = 0;
+      apresMessage(function () {
+        if (quitte || indiceFait) return;
+        tm = setTimeout(function () {
+          indiceFait = true;
+          if (row.scrollLeft > 4) return;
+          items.slice(0, 3).forEach(function (el) {
+            el.animate([{ transform: 'translateX(0)', easing: E_UI }, { transform: 'translateX(-24px)', easing: E_UI }, { transform: 'translateX(0)' }], { duration: 800 });
+          });
+        }, 1200);
+      });
       var annuler = function () { indiceFait = true; clearTimeout(tm); };
       ecoute(row, 'pointerdown', annuler);
       ecoute(row, 'scroll', annuler);
@@ -776,8 +787,11 @@
     construire();
     majBouton();
     // La première barre part quand l'œuvre du héros est affichée (connexion lente : on ne la saute pas)
+    // et, à la première visite, seulement après « OK » sur le message d'accueil
     var imH = imgDe(heros);
-    Promise.resolve(imH && imH.decode ? imH.decode().catch(noop) : null).then(function () { if (!quitte) lancer(); });
+    Promise.resolve(imH && imH.decode ? imH.decode().catch(noop) : null).then(function () {
+      apresMessage(function () { if (!quitte) lancer(); });
+    });
     return {
       quitter: function () {
         quitte = true;
@@ -942,10 +956,6 @@
         '<div class="fi-barre">' +
           '<nav class="mono fil d-only" aria-label="Fil d\'Ariane"><a href="#/galerie">Galerie</a> <span aria-hidden="true">/</span> <a href="' + lienCat + '">' + c.label + '</a> <span aria-hidden="true">/</span> <span aria-current="page">' + esc(o.type) + '</span></nav>' +
           '<a class="fi-retour m-only" href="#/galerie">← Galerie</a>' +
-          '<div class="fi-pn">' +
-            '<a href="' + lienOeuvre(p) + '" aria-label="Œuvre précédente"><span aria-hidden="true">←<span class="d-only"> Précédente</span></span></a>' +
-            '<a href="' + lienOeuvre(s) + '" aria-label="Œuvre suivante"><span aria-hidden="true"><span class="d-only">Suivante </span>→</span></a>' +
-          '</div>' +
         '</div>' +
         '<div class="fi">' +
           '<div class="fi-media">' +
@@ -953,6 +963,9 @@
               '<button type="button" class="fi-zoom" data-zoom aria-label="Voir l\'œuvre en grand"><img src="' + grande(o) + '" srcset="' + srcset(o) + '" sizes="(min-width: 760px) 490px, 82vw" alt="' + esc(alt(o)) + ', vue entière" width="' + o.w + '" height="' + o.h + '" fetchpriority="high"></button>' +
               // Vue simulée en grand (détail, signature, échelle), posée au clic sur une vignette
               '<div class="fi-sim" aria-live="polite"></div>' +
+              // Œuvres précédente et suivante : flèches rondes, même composant que l'accueil
+              '<a class="fleche fleche-p" href="' + lienOeuvre(p) + '" data-sens="-1" aria-label="Œuvre précédente">' + flecheIc(-1) + '</a>' +
+              '<a class="fleche fleche-s" href="' + lienOeuvre(s) + '" data-sens="1" aria-label="Œuvre suivante">' + flecheIc(1) + '</a>' +
             '</div>' +
             '<div class="fi-vues" role="group" aria-label="Vues de l\'œuvre">' +
               '<button type="button" class="vue-b vue1" data-vue="oeuvre" aria-pressed="true" aria-label="Vue entière de l\'œuvre"><img src="' + vignette(o) + '" alt="" width="' + o.w + '" height="' + o.h + '"></button>' +
@@ -1000,9 +1013,43 @@
       html: html, titre: o.type + ' · réf. ' + o.n, nav: 'galerie', appel: { oeuvre: o.n },
       apres: function () {
         justifier($('#autres-liste'), autres, nAutres);
-        $$('[data-zoom]', main).forEach(function (b) { b.addEventListener('click', function () { ouvrirVisio(o, b); }); });
-        // Vignettes : la vue choisie s'affiche en grand dans le cadre (la première ramène l'œuvre entière)
         var mur = $('.fi-mur', main), sim = $('.fi-sim', main);
+        // Flèches : enfoncement, rebond et onde ; on retient le sens pour le glissement et le rebond sur la fiche suivante
+        $$('.fleche', mur).forEach(function (b) {
+          appui(b, false);
+          b.addEventListener('click', function () { sensFiche = { d: +b.dataset.sens, fl: true, t: Date.now() }; });
+        });
+        // Arrivée par une flèche : la flèche de la nouvelle fiche garde le focus et finit le geste (rebond et onde)
+        var fl = sensFiche && sensFiche.fl && Date.now() - sensFiche.t < 1500 ? $('.fleche' + (sensFiche.d < 0 ? '-p' : '-s'), mur) : null;
+        focusApres = fl;
+        if (fl && !reduit()) {
+          if (fl.animate) {
+            fl.animate([{ transform: 'scale(' + reglageCss('--fl-appui') + ')' }, { transform: 'scale(1)' }],
+              { duration: reglageCss('--fl-retour-duree'), easing: getComputedStyle(document.documentElement).getPropertyValue('--e-ressort').trim() || E_ENTREE });
+            onde(fl);
+          }
+        }
+        sensFiche = null;
+        // Téléphone : glisser à gauche ou à droite sur l'image change d'œuvre (geste net et surtout horizontal)
+        var g = null, glisse = 0;
+        mur.addEventListener('pointerdown', function (e) {
+          g = e.pointerType === 'mouse' || e.target.closest('.fleche') ? null : { x: e.clientX, y: e.clientY, t: Date.now() };
+        });
+        mur.addEventListener('pointercancel', function () { g = null; });
+        mur.addEventListener('pointerup', function (e) {
+          if (!g) return;
+          var dx = e.clientX - g.x, dy = e.clientY - g.y, dt = Date.now() - g.t;
+          g = null;
+          if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5 || dt > 700) return;
+          glisse = Date.now();
+          var dir = dx < 0 ? 1 : -1; // vers la gauche : œuvre suivante
+          sensFiche = { d: dir, t: Date.now() };
+          location.hash = lienOeuvre(voisin(o, dir));
+        });
+        $$('[data-zoom]', main).forEach(function (b) {
+          b.addEventListener('click', function () { if (Date.now() - glisse > 400) ouvrirVisio(o, b); });
+        });
+        // Vignettes : la vue choisie s'affiche en grand dans le cadre (la première ramène l'œuvre entière)
         $$('[data-vue]', $('.fi-vues', main)).forEach(function (b) {
           b.addEventListener('click', function () {
             var t = b.dataset.vue;
@@ -1069,7 +1116,7 @@
               '<tr><th scope="row">Vit et travaille</th><td>En Suisse, <span class="ph">[ville à fournir]</span></td></tr>' +
               '<tr><th scope="row">Pratique</th><td>Peinture, collage, sculpture sur bois, dessin</td></tr>' +
               '<tr><th scope="row">Expositions</th><td>Pop-up Pepeuf, Markthalle Basel, 22–28 juin 2026<br><span class="ph">[autres expositions à fournir]</span></td></tr>' +
-              '<tr><th scope="row">Instagram</th><td><a href="' + INSTA + '" target="_blank" rel="noopener">@promeneur_armel_studio ↗</a></td></tr>' +
+              '<tr><th scope="row">Instagram</th><td>' + lienInsta() + '</td></tr>' +
             '</tbody></table>' +
             '<p class="ap-bio"><span class="ph">[Biographie à écrire avec Armel, cinq à huit lignes&#8239;: son parcours, ses techniques, les artistes qui l\'inspirent (il a signé des hommages à Wifredo Lam et à Picasso).]</span></p>' +
           '</div>' +
@@ -1138,7 +1185,7 @@
               '<h2 id="imp-titre" tabindex="-1">Impressum</h2>' +
               '<div class="lg-cols">' +
                 '<div><p class="mono">Responsable du site</p><p><strong>Armel Promeneur</strong> <span class="ph">[nom civil, si différent du nom d\'artiste]</span><br>Peintre et sculpteur<br><span class="ph">[adresse postale à fournir]</span><br><span class="ph">[NPA, localité]</span></p></div>' +
-                '<div><p class="mono">Contact</p><p><span class="ph">[e-mail à fournir]</span><br>Instagram <a href="' + INSTA + '" target="_blank" rel="noopener">@promeneur_armel_studio</a></p></div>' +
+                '<div><p class="mono">Contact</p><p><span class="ph">[e-mail à fournir]</span><br>Instagram ' + lienInsta() + '</p></div>' +
               '</div>' +
               '<h3>Registre du commerce</h3>' +
               '<p><span class="ph">[Aucune inscription trouvée sur Zefix&#8239;: indiquer le numéro IDE s\'il existe, sinon retirer ce paragraphe.]</span></p>' +
@@ -1289,6 +1336,7 @@
 
   var actuel = null;
   var premiere = true;
+  var focusApres = null; // élément à reprendre le focus après le changement de page (sinon le titre)
   var quitterPage = null;
   var defilements = {}; // position de défilement de chaque page quittée (retour depuis une fiche)
 
@@ -1324,6 +1372,7 @@
     pied.innerHTML = piedHtml();
     document.title = r.page === 'accueil' ? p.titre : p.titre + ' — ' + NOM;
     majNav(p.nav);
+    focusApres = null;
     if (p.apres) p.apres();
     quitterPage = p.quitter || null;
     brancherFormulaire(p.appel);
@@ -1331,7 +1380,8 @@
 
     // Zone d'annonce fixe (hors de <main>) : le nouveau nombre d'œuvres est lu après un changement de filtre
     var statutEl = document.getElementById('annonce');
-    if (statutEl) statutEl.textContent = meme && p.annonce ? p.annonce : '';
+    // (fiche → fiche par une flèche : le focus reste sur la flèche, on annonce la nouvelle œuvre)
+    if (statutEl) statutEl.textContent = meme && p.annonce ? p.annonce : focusApres ? p.titre : '';
 
     if (meme) {
       var f2 = $('.filtres', main);
@@ -1346,7 +1396,8 @@
           var cs = $$('a[href="#/oeuvre/' + nQuitte + '"]', main).filter(function (a) { return a.getBoundingClientRect().width > 0; });
           carteQ = cs.filter(dansFenetre)[0] || cs[0] || null;
         }
-        (carteQ || h1) && (carteQ || h1).focus({ preventScroll: true });
+        var cibleF = focusApres || carteQ || h1;
+        if (cibleF) cibleF.focus({ preventScroll: true });
       }
     }
     preparerApparitions();
@@ -1356,6 +1407,7 @@
 
   /* ---------- Transitions de page (View Transitions, sinon rien) ---------- */
   var dernierClic = null; // lien d'œuvre cliqué : sa vignette grandit jusqu'à l'image de la fiche
+  var sensFiche = null;   // fiche → fiche : { d: −1 ou 1, fl: venu d'une flèche, t: moment }
   document.addEventListener('click', function (ev) {
     var a = ev.target.closest && ev.target.closest('a[href^="#/oeuvre/"]');
     if (!a) { dernierClic = null; return; }
@@ -1380,6 +1432,16 @@
     });
   }
 
+  // Fiche : l'œuvre et ses infos glissent ; le cadre et les flèches gardent leur place
+  function nommerFiche(oui) {
+    var im = $('.fi-zoom', main), inf = $('.fi-info', main);
+    if (im) im.style.viewTransitionName = oui ? 'fi-img' : '';
+    if (inf) inf.style.viewTransitionName = oui ? 'fi-info' : '';
+    $$('.fi-mur .fleche', main).forEach(function (b) {
+      b.style.viewTransitionName = oui ? (b.classList.contains('fleche-p') ? 'fi-fl-p' : 'fi-fl-s') : '';
+    });
+  }
+
   var vtN = 0; // numéro de la dernière transition lancée
   function naviguer() {
     var r = analyser();
@@ -1387,10 +1449,18 @@
     var sousAncre = actuel && actuel.page === 'impressum' && r.page === 'impressum';
     if (!document.startViewTransition || reduit() || !actuel || sousAncre) { router(r); return; }
 
-    var type = 'page';
+    var type = 'page', sens = 1;
+    var clicCarte = dernierClic && dernierClic.img && r.page === 'oeuvre' && dernierClic.href === '#/oeuvre/' + r.oeuvre.n && Date.now() - dernierClic.t < 2000;
     if (actuel.page === 'galerie' && r.page === 'galerie' && etatGalerie(actuel.q).vue === 'grille' && etatGalerie(r.q).vue === 'grille') type = 'filtre';
+    else if (actuel.page === 'oeuvre' && r.page === 'oeuvre' && actuel.oeuvre !== r.oeuvre && !clicCarte) {
+      // Fiche → fiche : glissement dans le sens du geste (sinon le plus court chemin dans la liste)
+      type = 'fiche';
+      var dd = (rang(r.oeuvre) - rang(actuel.oeuvre) + TOTAL) % TOTAL;
+      sens = sensFiche && Date.now() - sensFiche.t < 1500 ? sensFiche.d : (dd > TOTAL / 2 ? -1 : 1);
+    }
     var source = null, retourN = null;
     if (type === 'filtre') nommerCartes(true);
+    else if (type === 'fiche') nommerFiche(true);
     else if (r.page === 'oeuvre' && dernierClic && dernierClic.href === '#/oeuvre/' + r.oeuvre.n && Date.now() - dernierClic.t < 2000) source = dernierClic.img;
     else if (actuel.page === 'oeuvre' && r.page !== 'oeuvre') { source = $('.fi-mur[data-vue="oeuvre"] .fi-zoom img', main); retourN = actuel.oeuvre.n; }
     dernierClic = null;
@@ -1400,12 +1470,14 @@
     var cible = null;
     var html = document.documentElement;
     html.setAttribute('data-vt', type);
+    html.setAttribute('data-sens', String(sens));
     var t, mon = ++vtN;
     try {
       t = document.startViewTransition(function () {
         if (source) source.style.viewTransitionName = '';
         router(analyser() || r);
         if (type === 'filtre') { nommerCartes(true); return null; }
+        if (type === 'fiche') { nommerFiche(true); return null; }
         if (!source) return null;
         cible = r.page === 'oeuvre' ? $('.fi-zoom img', main) : trouverImage(retourN);
         if (!cible) return null;
@@ -1413,12 +1485,14 @@
         // On attend l'image prête (au plus 400 ms), sinon elle grandirait vide
         return Promise.race([cible.decode ? cible.decode().catch(noop) : null, attendre(400)]);
       });
-    } catch (e) { html.removeAttribute('data-vt'); router(r); return; }
+    } catch (e) { html.removeAttribute('data-vt'); html.removeAttribute('data-sens'); router(r); return; }
     var fin = function () {
       if (cible) cible.style.viewTransitionName = '';
       if (mon !== vtN) return; // une autre transition a commencé entre-temps : elle nettoiera
       html.removeAttribute('data-vt');
+      html.removeAttribute('data-sens');
       nommerCartes(false);
+      nommerFiche(false);
     };
     if (t.ready) t.ready.catch(noop);
     if (t.updateCallbackDone) t.updateCallbackDone.catch(noop);
@@ -1430,7 +1504,7 @@
   var btnMenu = document.getElementById('menu-btn');
   var btnFermer = document.getElementById('menu-x');
   function bloquer(oui) {
-    var ouvert = oui || !menu.hidden || !visio.hidden;
+    var ouvert = oui || !menu.hidden || !visio.hidden || !!(msg && msg.open);
     document.documentElement.classList.toggle('bloque', ouvert);
   }
   function ouvrirMenu() {
@@ -1464,6 +1538,7 @@
 
   /* ---------- Clavier ---------- */
   document.addEventListener('keydown', function (ev) {
+    if (msg && msg.open) return; // la fenêtre du message gère Échap et le focus elle-même
     if (ev.key === 'Escape') {
       if (!visio.hidden) { fermerVisio(true); return; }
       if (!menu.hidden) { fermerMenu(true); return; }
@@ -1482,6 +1557,7 @@
     // Fiche œuvre : ← → pour passer à l'œuvre voisine
     if (actuel.page === 'oeuvre') {
       ev.preventDefault();
+      sensFiche = { d: dir, t: Date.now() };
       location.hash = lienOeuvre(voisin(actuel.oeuvre, dir));
     }
   });
@@ -1504,6 +1580,85 @@
     var h1 = $('h1', main);
     (h1 || main).focus({ preventScroll: true });
   });
+
+  /* ---------- Message d'accueil de Dylan (fenêtre au milieu de l'écran) ----------
+     Une fois par appareil (mémorisé), puis « Relire le message » dans le bandeau le rouvre.
+     <dialog> + showModal : focus sur OK, Échap = OK, focus rendu, défilement bloqué.
+     L'automatique du héros attend « OK » (apresMessage). Mouvement réduit : simple fondu. */
+  var CLE_MESSAGE = 'armel-proto-message-vu';
+  var msg = document.getElementById('msg');
+  var msgCarte = $('.msg-carte', msg), msgFond = $('.msg-fond', msg), msgOk = document.getElementById('msg-ok');
+  var msgVu = false;
+  try { msgVu = window.localStorage.getItem(CLE_MESSAGE) === '1'; } catch (e) { /* stockage indisponible : montré à chaque visite */ }
+  var messageAttendu = !!msg.showModal && !msgVu; // le message va s'ouvrir : l'automatique attend
+  var fileMessage = [], msgRetour = null, msgFerme = false;
+  function apresMessage(f) { if (messageAttendu) fileMessage.push(f); else f(); }
+  function ouvrirMessage() {
+    if (!msg.showModal || msg.open) return;
+    msgRetour = document.activeElement;
+    msgFerme = false;
+    msgOk.classList.remove('appuye');
+    msg.showModal();
+    bloquer(true);
+    msgOk.focus({ preventScroll: true });
+    if (!msgCarte.animate) return;
+    if (reduit()) { // simple fondu
+      [msgFond, msgCarte].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: E_UI }); });
+      return;
+    }
+    // Fond qui s'assombrit et se floute, carte qui monte et grandit, lignes en cascade, salut de l'émoji
+    msgFond.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: E_UI });
+    msgCarte.animate([{ opacity: 0, transform: 'translateY(24px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: E_ENTREE });
+    $$('.msg-l', msgCarte).forEach(function (el, i) {
+      el.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 500, delay: 160 + i * 80, easing: E_ENTREE, fill: 'backwards' });
+    });
+    $('.msg-emoji', msgCarte).animate([
+      { transform: 'rotate(0deg)' }, { transform: 'rotate(-16deg)', offset: .35 }, { transform: 'rotate(6deg)', offset: .7 }, { transform: 'rotate(0deg)' }
+    ], { duration: 900, delay: 700, easing: 'ease-in-out' });
+  }
+  // OK (ou Échap) : bouton enfoncé, puis la carte s'efface (300 ms)
+  function fermerMessage() {
+    if (!msg.open || msgFerme) return;
+    msgFerme = true;
+    try { window.localStorage.setItem(CLE_MESSAGE, '1'); } catch (e) { /* le site marche sans */ }
+    var fin = function () { if (msg.open) msg.close(); };
+    if (!msgCarte.animate) { fin(); return; }
+    var r = reduit(), d = r ? 200 : 300, delai = r ? 0 : reglageCss('--fl-appui-duree');
+    msgOk.classList.add('appuye');
+    var a = msgCarte.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: r ? 'none' : 'scale(.98)' }], { duration: d, delay: delai, easing: E_UI, fill: 'forwards' });
+    msgFond.animate([{ opacity: 1 }, { opacity: 0 }], { duration: d, delay: delai, easing: E_UI, fill: 'forwards' });
+    a.finished.then(fin, fin);
+  }
+  // Fermeture réelle (OK, Échap, ou fermeture imposée par le navigateur) : on remet tout en ordre
+  msg.addEventListener('close', function () {
+    msgFerme = false;
+    msgOk.classList.remove('appuye');
+    [msgCarte, msgFond].forEach(function (el) { if (el.getAnimations) el.getAnimations().forEach(function (a) { a.cancel(); }); });
+    try { window.localStorage.setItem(CLE_MESSAGE, '1'); } catch (e) { /* le site marche sans */ }
+    bloquer(false);
+    if (msgRetour && msgRetour !== document.body && document.contains(msgRetour)) msgRetour.focus({ preventScroll: true });
+    else { var h1m = $('h1', main); if (h1m) h1m.focus({ preventScroll: true }); }  // rien n'avait le focus : on repart du titre de la page
+    msgRetour = null;
+    if (messageAttendu) {
+      messageAttendu = false;
+      var f = fileMessage; fileMessage = [];
+      f.forEach(function (fn) { fn(); });
+    }
+  });
+  msg.addEventListener('cancel', function (ev) { ev.preventDefault(); fermerMessage(); }); // Échap = OK
+  msgOk.addEventListener('click', fermerMessage);
+  msgOk.addEventListener('pointerdown', function (e) { if (e.button === 0) msgOk.classList.add('appuye'); });
+  ['pointerleave', 'pointercancel'].forEach(function (t) { msgOk.addEventListener(t, function () { if (!msgFerme) msgOk.classList.remove('appuye'); }); });
+  document.getElementById('proto-msg').addEventListener('click', ouvrirMessage);
+
+  /* ---------- En-tête collant : verre dès qu'il colle en haut (classe utilisée par verre.css) ---------- */
+  var hdEl = document.getElementById('hd'), rafDefile = 0;
+  function majDefile() {
+    rafDefile = 0;
+    document.documentElement.classList.toggle('hd-colle', window.scrollY > 0 && hdEl.getBoundingClientRect().top <= 0);
+  }
+  window.addEventListener('scroll', function () { if (!rafDefile) rafDefile = requestAnimationFrame(majDefile); }, { passive: true });
 
   /* ---------- Redimensionnement ---------- */
   var minuterie = null;
@@ -1530,4 +1685,18 @@
 
   window.addEventListener('hashchange', naviguer);
   router();
+  majDefile();
+
+  // Première visite : le message s'ouvre après le chargement de l'image du héros (ou de l'image principale de la page)
+  if (messageAttendu) {
+    var pret = false;
+    var montrer = function () {
+      if (pret) return;
+      pret = true;
+      requestAnimationFrame(function () { setTimeout(ouvrirMessage, 150); });
+    };
+    var imP = $$('img[fetchpriority="high"]', main).filter(function (i) { return i.getBoundingClientRect().width > 0; })[0];
+    if (imP) { quandCharge(imP, montrer); setTimeout(montrer, 3000); } // connexion lente : au plus 3 s
+    else montrer();
+  }
 })();
