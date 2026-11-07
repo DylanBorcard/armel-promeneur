@@ -1606,16 +1606,13 @@
       [msgFond, msgCarte].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 250, easing: E_UI }); });
       return;
     }
-    // Fond qui s'assombrit et se floute, carte qui monte et grandit, lignes en cascade, salut de l'émoji
+    // Fond qui s'assombrit et se floute, carte qui monte et grandit, lignes en cascade
     msgFond.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: E_UI });
     msgCarte.animate([{ opacity: 0, transform: 'translateY(24px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: E_ENTREE });
     $$('.msg-l', msgCarte).forEach(function (el, i) {
       el.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
         { duration: 500, delay: 160 + i * 80, easing: E_ENTREE, fill: 'backwards' });
     });
-    $('.msg-emoji', msgCarte).animate([
-      { transform: 'rotate(0deg)' }, { transform: 'rotate(-16deg)', offset: .35 }, { transform: 'rotate(6deg)', offset: .7 }, { transform: 'rotate(0deg)' }
-    ], { duration: 900, delay: 700, easing: 'ease-in-out' });
   }
   // OK (ou Échap) : bouton enfoncé, puis la carte s'efface (300 ms)
   function fermerMessage() {
