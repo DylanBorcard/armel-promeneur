@@ -411,13 +411,14 @@
     form$ = {
       preremplir: preremplir,
       // Fiche œuvre : formulaire prérempli. Ordinateur : défile jusqu'au bloc, focus sur « Nom ».
-      // Sous 1024 px (bloc empilé) : défile droit au formulaire, sous l'en-tête collé.
+      // Sous 1024 px (bloc empilé) : saute d'un coup au formulaire, sous l'en-tête collé (choix de Dylan, sans défilement animé).
       // Écran tactile : pas de focus, sinon le clavier de l'iPhone s'ouvre et cache le formulaire.
       ouvrir: function (n, d) {
         preremplir(n, d);
         var comp = { behavior: reduit() ? 'auto' : 'smooth' };
         if (window.innerWidth < 1024) {
           var hd = $('.hd'), haut = hd ? hd.getBoundingClientRect().height : 0;
+          comp.behavior = 'auto';
           comp.top = Math.max(0, form.getBoundingClientRect().top + window.scrollY - haut - 16);
           window.scrollTo(comp);
         } else {
