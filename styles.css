@@ -1056,6 +1056,57 @@ html[data-sens="-1"]::view-transition-new(fi-img), html[data-sens="-1"]::view-tr
 @keyframes vt-fiche-sortie-g { to { opacity: 0; transform: translateX(40px); } }
 @keyframes vt-fiche-entree-g { from { opacity: 0; transform: translateX(-40px); } }
 
+/* ---------- V7 : mode « Simulation » ----------
+   Chaque emplacement à compléter existe en deux versions : l'annotation (.ph, .phl, étiquettes .ex, textes .av)
+   et la valeur inventée (.sv, de simulation.js). html.simu (pastille fixe en bas de l'écran) choisit laquelle s'affiche.
+   .reste : valeur absente de simulation.js, l'annotation reste visible. */
+html:not(.simu) .sv { display: none !important; }
+html.simu .ph:not(.reste), html.simu .phl:not(.reste), html.simu .ex, html.simu .av,
+html.simu .cto-lib, html.simu .cto-note { display: none !important; }
+/* Vues simulées de la fiche : petite légende propre à la place du cartouche entre crochets */
+.cto-sv { display: block; font-size: 11.5px; line-height: 1.3; color: var(--noir); }
+.cto.grand .cto-sv { font-size: 14px; }
+html.simu .cto { right: auto; }
+/* Vignette « Signature » cachée en simulation quand la découpe ne montre pas de vraie signature (signée au dos…) */
+html.simu .vue-b.sig-cache { display: none; }
+@media (max-width: 759px) {
+  .cto-sv { font-size: 10.5px; }
+  .cto.grand .cto-sv { font-size: 13px; }
+}
+
+/* Pastille « Simulation » : fixe en bas à droite sur téléphone et tablette (seul coin libre), en bas à gauche sur
+   ordinateur (dès 1024 px) : mesuré de 1024 à 1920 px, ce coin est dégagé à la première vue de toutes les pages
+   (navigation et cartel de l'accueil, « Acheter » de la fiche, contact), alors qu'à droite elle couvrait « Acheter »
+   à 1366×768. Quand un lien ou un bouton passe dessous (pied de page…), app.js la fait monter (--leve).
+   Au-dessus du contenu et de l'en-tête, sous le menu, la visionneuse et le message (cachée quand ils sont ouverts). */
+.simu-btn {
+  position: fixed; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 100;
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; margin: 0; padding: 0 14px 0 9px;
+  border: 1px solid rgba(17,17,17,.12); border-radius: 19px; background: #fff; color: var(--noir);
+  font: 500 12.5px/1 var(--f-petit); letter-spacing: .01em; cursor: pointer;
+  box-shadow: var(--bouton-ombre); -webkit-tap-highlight-color: transparent;
+  translate: 0 var(--leve, 0px);  /* --leve : posé par app.js quand la pastille monte au-dessus d'un lien ou d'un bouton */
+  transition: transform var(--fl-retour-duree) var(--e-ressort), translate .25s var(--e-ui), background-color .2s var(--e-ui), color .2s var(--e-ui);
+}
+.simu-btn::after { content: ""; position: absolute; inset: -4px; }  /* cible tactile de 46 px */
+.simu-btn.appuye { transform: scale(var(--fl-appui)); transition-duration: var(--fl-appui-duree); }
+.simu-btn:focus-visible { outline: 2px solid var(--noir); outline-offset: 3px; }
+.simu-pi { position: relative; flex: none; width: 26px; height: 16px; border-radius: 8px; background: var(--filet); transition: background-color .2s var(--e-ui); }
+.simu-pi::before {
+  content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s var(--e-ui);
+}
+html.simu .simu-btn { background: var(--noir); border-color: var(--noir); color: #fff; }
+html.simu .simu-pi { background: #fff; }
+html.simu .simu-pi::before { transform: translateX(10px); background: var(--noir); box-shadow: none; }
+html.bloque .simu-btn { display: none; }
+@media (max-width: 759px) {
+  .simu-btn { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); height: 36px; padding: 0 12px 0 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px -8px rgba(0,0,0,.28); }
+  .simu-btn::after { inset: -5px; }  /* 46 px */
+}
+@media (min-width: 1024px) { .simu-btn { right: auto; left: 24px; } }
+@media print { .simu-btn { display: none; } }
+
 /* ---------- Mouvements réduits : tout mouvement coupé ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

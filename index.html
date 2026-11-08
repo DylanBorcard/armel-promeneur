@@ -11,6 +11,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600&amp;family=Inter:wght@400;500;600&amp;family=DM+Sans:wght@400;500&amp;display=swap">
+<!-- V7 : mode « Simulation » mémorisé sur cet appareil, posé avant le premier affichage (pas d'éclair d'annotations) -->
+<script>try { if (localStorage.getItem('armel-proto-simulation') === '1') document.documentElement.classList.add('simu'); } catch (e) {}</script>
 <link rel="stylesheet" href="styles.css">
 <!-- Effet verre : retirer cette ligne pour revenir en arrière -->
 <link rel="stylesheet" href="verre.css">
@@ -22,7 +24,7 @@
 <!-- Bandeau du prototype (choix de Dylan) -->
 <div class="proto" id="proto" role="note" aria-label="Prototype">
   <div class="proto-in">
-    <p>Prototype de travail&#8239;: statuts et prix fictifs (exemples), textes à compléter. <button type="button" class="proto-msg" id="proto-msg">Relire le message</button></p>
+    <p><span class="av">Prototype de travail&#8239;: statuts et prix fictifs (exemples), textes à compléter. </span><span class="sv">Simulation&#8239;: titres, textes et prix inventés pour se faire une idée. </span><button type="button" class="proto-msg" id="proto-msg">Relire le message</button></p>
     <button type="button" class="proto-x" id="proto-x" aria-label="Fermer le bandeau">×</button>
   </div>
 </div>
@@ -70,6 +72,9 @@
 <!-- Annonces pour les lecteurs d'écran (nombre d'œuvres après un filtre) -->
 <p class="vh" id="annonce" role="status" aria-live="polite"></p>
 
+<!-- V7 : bouton « Simulation » (pastille fixe en bas, à droite sur téléphone, à gauche sur ordinateur ; placée ici pour l'ordre de tabulation) : informations inventées ou annotations à compléter -->
+<button type="button" class="simu-btn" id="simu-btn" aria-pressed="false" title="Montrer le site avec des informations inventées, ou les endroits à compléter"><span class="simu-pi" aria-hidden="true"></span>Simulation</button>
+
 <!-- Visionneuse plein écran (fiche œuvre) -->
 <div class="visio" id="visio" role="dialog" aria-modal="true" aria-label="Œuvre en grand" hidden>
   <button type="button" class="visio-x" id="visio-x" aria-label="Fermer la vue en grand">×</button>
@@ -90,6 +95,7 @@
 </dialog>
 
 <script src="data.js"></script>
+<script src="simulation.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

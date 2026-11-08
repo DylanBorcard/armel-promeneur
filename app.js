@@ -41,6 +41,9 @@
     signature: { lib: '[Photo de la signature]', court: '[Signature]', note: 'sera remplacée par une vraie photo de la signature' },
     echelle: { lib: '[Vue à l\'échelle, quand les dimensions seront connues]', court: '[Échelle]', note: 'sera remplacée par une vraie vue à l\'échelle' }
   };
+  // Simulation : la vignette « Signature » ne reste que si sa découpe montre une vraie signature (SIM_SIGNATURE)
+  // et que simulation.js ne la dit pas au dos ou sous la base ; sinon elle mentirait (légende « Signature » sur un coin vide)
+  function sigCachee(o) { var e = simuO(o, 'edition') || ''; return !SIM_SIGNATURE[o.n] || /au dos|sous la base/.test(e); }
   function simPos(o, t) { return t === 'detail' ? (SIM_DETAIL[o.n] || '50% 45%') : (SIM_SIGNATURE[o.n] || '94% 94%'); }
   // Vignette : le cartouche se met du côté opposé à la zone agrandie (en bas d'habitude, en haut pour une signature en bas)
   function ctoHaut(o, t) { return t !== 'echelle' && parseFloat(simPos(o, t).split(' ')[1]) > 50; }
@@ -53,9 +56,10 @@
   function cartouche(o, t, grand) {
     var x = SIM_TXT[t], lib = t === 'detail' ? '[Photo de détail ' + CAT_PLUS[o.cat].detail + ']' : x.lib;
     var note = '<b>Simulation</b>&#8239;: ' + x.note;
-    if (grand) return '<p class="cto grand"><span class="cto-lib">' + lib + '</span><span class="cto-note">' + note + '</span></p>';
+    var leg = '<span class="sv cto-sv">' + SIM_LEG[t] + '</span>'; // mode Simulation : légende propre
+    if (grand) return '<p class="cto grand"><span class="cto-lib">' + lib + '</span><span class="cto-note">' + note + '</span>' + leg + '</p>';
     return '<span class="cto"><span class="cto-lib"><span class="d-only">' + lib + '</span><span class="m-only">' + x.court + '</span></span>' +
-      '<span class="cto-note"><span class="d-only">' + note + '</span><span class="m-only"><b>Simulation</b></span></span></span>';
+      '<span class="cto-note"><span class="d-only">' + note + '</span><span class="m-only"><b>Simulation</b></span></span>' + leg + '</span>';
   }
 
   // Œuvre montrée en grand dans la page À propos (une œuvre du catalogue, donc reliée à sa fiche)
@@ -86,6 +90,67 @@
   // Prix au format suisse : CHF 1'800.–
   function chf(v) { return 'CHF ' + String(v).replace(/\B(?=(\d{3})+(?!\d))/g, "'") + '.–'; }
   var EX = ' <span class="ex">exemple</span>'; // espace devant : « CHF 1'800.– exemple » aussi pour les lecteurs d'écran
+
+  /* ---------- V7 : mode « Simulation » (pastille fixe en bas de l'écran) ----------
+     Chaque emplacement à compléter rend DEUX versions côte à côte : l'annotation (.ph, .phl : entre crochets,
+     bord en traitillé) et la valeur inventée (.sv), tirée de simulation.js (window.SIMU). La classe html.simu
+     choisit en CSS laquelle s'affiche (.ex et .av disparaissent aussi). Valeur absente : l'annotation reste
+     visible même en simulation (.reste), jamais « undefined ». */
+  var SIMU = window.SIMU || {};
+  var SIMU_O = SIMU.oeuvres || {};
+  var SIMU_T = SIMU.textes || {};
+  // Emplacements hors du schéma de simulation.js (À propos, impressum) : valeurs inventées ici, remplaçables
+  // par une clé du même nom dans SIMU.textes. Chaîne vide = l'annotation disparaît sans rien à la place.
+  var SIMU_CODE = {
+    trait: 'Tout part d\'un trait noir, posé sans esquisse. Le visage vient d\'un seul geste, puis la couleur remplit les formes, en aplats francs.',
+    collage: 'Tissus imprimés, papiers peints, pages de livres : Armel colle ce qu\'il trouve à même la peinture. Un motif devient une joue, un col, un fond.',
+    bois: 'Les sculptures naissent de souches ramassées près de chez lui. Armel suit la forme du bois, creuse à la gouge, puis le peint ou le laisse brut.',
+    auteurPhotos: '(photos : Armel Promeneur)',
+    siVente: '',
+    fraisLivraison: 'sont indiqués avant la commande',
+    cgv: 'Les conditions de vente sont jointes à chaque confirmation de commande.',
+    siVenteAchat: '(par le formulaire de contact)',
+    moyenPaiement: 'Le paiement se fait par virement bancaire ou par TWINT.',
+    cookiesVente: '',
+    polices: 'Les polices d\'écriture sont hébergées sur le serveur du site.',
+    hebergeur: '(en Suisse)',
+    outilForm: '(en Suisse)',
+    messagerie: '(en Suisse)',
+    achatPrestataires: 'le prestataire de paiement et La Poste',
+    siFactures: '',
+    dateVersion: '1er novembre 2026'
+  };
+  // Légendes propres des vues simulées de la fiche (à la place du cartouche entre crochets)
+  var SIM_LEG = { detail: 'Détail', signature: 'Signature', echelle: 'Vue à l\'échelle' };
+  function simuO(o, k) { var x = o && SIMU_O[o.n]; return x && typeof x[k] === 'string' && x[k] ? x[k] : null; }
+  function adressePd() { var a = simuT('adresse'), n = simuT('npaLocalite'); return a && n ? a + ', ' + n : a; }
+  function titreAn(o) { var t = simuO(o, 'titre'), a = simuO(o, 'annee'); return t && a ? t + ', ' + a : t; }
+  function simuT(k) {
+    var v = SIMU_T[k];
+    if (Array.isArray(v)) return v.length ? { h: v.map(esc).join('<br>') } : null;
+    if (typeof v === 'string') return v;
+    return SIMU_CODE[k] != null ? SIMU_CODE[k] : null;
+  }
+  // Annotation + valeur inventée. a : HTML de l'annotation ; v : texte (ou { h: HTML }), null = manque ;
+  // cls : classes communes (d-only, l-y…) ; attr : attributs de la valeur (mise à jour en direct) ; k : 'ph' ou 'phl'
+  function ph(a, v, cls, attr, k) {
+    var c = cls ? ' ' + cls : '';
+    return '<span class="' + (k || 'ph') + (v == null ? ' reste' : '') + c + '">' + a + '</span>' +
+      '<span class="sv' + c + '"' + (attr || '') + '>' + (v == null ? '' : v.h != null ? v.h : esc(v)) + '</span>';
+  }
+  // Mise à jour en direct d'une valeur inventée (cartels de l'accueil, aperçu de l'index)
+  function majSv(sv, v) {
+    if (!sv) return;
+    sv.textContent = v == null ? '' : v;
+    if (sv.previousElementSibling) sv.previousElementSibling.classList.toggle('reste', v == null);
+  }
+  // Deux versions d'un petit bout de texte (ex. « les » / « Les » quand l'annotation qui précède disparaît)
+  // Fins de phrase gardées entières dans les deux versions : couper le texte de la V6 décale les lettres d'un 64e de pixel
+  var PRIX_TXT = ' prix sont indiqués en francs suisses (CHF) et sont les prix effectivement à payer&#8239;; les frais de livraison ';
+  var FACT_TXT = ' factures et les pièces comptables sont conservées 10 ans, comme la loi l\'exige.';
+  function deux(a, s) { return '<span class="av">' + a + '</span><span class="sv">' + s + '</span>'; }
+  function simuOn() { return document.documentElement.classList.contains('simu'); }
+  function libVendue() { return simuOn() ? ' (vendue)' : ' (vendue, exemple)'; }
   // Pastille rouge des œuvres vendues (seule couleur ajoutée ; le mot « Vendue » reste écrit en encre)
   var PASTILLE = '<span class="pastille" aria-hidden="true"></span>';
   function dispo(o) { return o.statut === 'disponible'; }
@@ -167,7 +232,7 @@
     return '<a class="carte" href="' + lienOeuvre(o) + '"' + style + (opts.rv ? ' data-rv' : '') + '>' +
       '<span class="carte-hd mono">' + esc(o.type) + '</span>' +
       '<span class="carte-im"><img src="' + vignette(o) + '" alt="' + esc(alt(o)) + '" width="' + o.w + '" height="' + o.h + '" ' + (opts.eager ? 'fetchpriority="high"' : 'loading="lazy"') + ' decoding="async" style="aspect-ratio:' + o.w + ' / ' + o.h + '"></span>' +
-      '<span class="carte-lg"><span class="ph">[Titre, année]</span>' + prix + '</span></a>';
+      '<span class="carte-lg">' + ph('[Titre, année]', titreAn(o)) + prix + '</span></a>';
   }
 
   // Blocs justifiés de la page en cours (recalculés au redimensionnement)
@@ -243,7 +308,7 @@
     var nSel = v.oeuvre && PAR_N[v.oeuvre] ? v.oeuvre : '';
     var options = '<option value=""' + (nSel ? '' : ' selected') + '>Aucune en particulier</option>' +
       LISTE.map(function (o) {
-        return '<option value="' + o.n + '"' + (o.n === nSel ? ' selected' : '') + '>N° ' + o.n + ' · ' + esc(o.type) + (dispo(o) ? '' : ' (vendue, exemple)') + '</option>';
+        return '<option value="' + o.n + '"' + (o.n === nSel ? ' selected' : '') + (dispo(o) ? '>' : ' data-vendue>') + 'N° ' + o.n + ' · ' + esc(o.type) + (dispo(o) ? '' : libVendue()) + '</option>';
       }).join('');
     var titre = grand
       ? '<h1 class="appel-t" id="appel-titre" tabindex="-1" data-rv="lignes">' + lignes(['Contact']) + '</h1>' +
@@ -251,16 +316,16 @@
       : '<h2 class="appel-t" id="appel-titre" data-rv="lignes">' + lignes(['Une œuvre', 'vous intéresse&#8239;?']) + '</h2>';
     var moyens = grand
       ? '<dl class="ct-dl">' +
-          '<div><dt class="mono">E-mail</dt><dd><span class="ph">[adresse à fournir]</span></dd></div>' +
+          '<div><dt class="mono">E-mail</dt><dd>' + ph('[adresse à fournir]', simuT('email')) + '</dd></div>' +
           '<div><dt class="mono">Instagram</dt><dd>' + lienInsta() + '</dd></div>' +
-          '<div><dt class="mono">Lieu</dt><dd>En Suisse, <span class="ph">[ville]</span></dd></div>' +
+          '<div><dt class="mono">Lieu</dt><dd>En Suisse, ' + ph('[ville]', simuT('ville')) + '</dd></div>' +
         '</dl>'
       : '<p class="appel-insta"><span class="mono">Instagram</span>' + lienInsta() + '</p>';
     var err = function (id) { return '<span class="err" id="' + id + '-err" hidden></span>'; };
     return '<section class="appel' + (grand ? ' grand' : '') + '" id="appel" aria-labelledby="appel-titre"><div class="appel-in">' +
       '<div class="appel-g">' + titre +
         '<div class="appel-armel"><img src="img/portrait-armel-2.jpg" alt="Armel Promeneur" width="900" height="1010"' + (grand ? '' : ' loading="lazy"') + ' decoding="async" data-rv="clip">' +
-          '<div><blockquote class="appel-cit"><p>«&#8239;<span class="ph">[Une phrase d\'Armel aux visiteurs, à fournir]</span>&#8239;»</p></blockquote>' +
+          '<div><blockquote class="appel-cit"><p>«&#8239;' + ph('[Une phrase d\'Armel aux visiteurs, à fournir]', simuT('appelCitation')) + '&#8239;»</p></blockquote>' +
           '<p class="mono appel-sig">Armel Promeneur</p></div></div>' +
         moyens +
       '</div>' +
@@ -400,8 +465,8 @@
         '<div class="hero-d">' +
           '<a class="hero-tout" href="#/galerie">Voir les ' + TOTAL + ' œuvres <span aria-hidden="true">→</span></a>' +
           '<div class="cartel" aria-live="polite">' +
-            '<p class="cart-titre"><span class="ph">[Titre à fournir]</span></p>' +
-            '<p class="cart-type"><span data-h="type">' + esc(o.type) + '</span> · <span class="ph">[année]</span></p>' +
+            '<p class="cart-titre">' + ph('[Titre à fournir]', simuO(o, 'titre'), '', ' data-h="titre"') + '</p>' +
+            '<p class="cart-type"><span data-h="type">' + esc(o.type) + '</span> · ' + ph('[année]', simuO(o, 'annee'), '', ' data-h="annee"') + '</p>' +
             '<p class="cart-statut" data-h="statut">' + statut(o) + '</p>' +
             '<a class="cart-voir" data-h="voir" href="' + lienOeuvre(o) + '"><span>Voir l\'œuvre</span> <span aria-hidden="true">→</span></a>' +
           '</div>' +
@@ -421,7 +486,7 @@
           '</div>' +
           '<div class="r-barre" aria-hidden="true"><span class="r-pos" style="width:calc(100% / ' + TOTAL + ');--nb:' + TOTAL + '"></span></div>' +
           '<div class="cartel-m" aria-live="polite">' +
-            '<p class="cart-titre-m"><span class="ph">[Titre à fournir]</span> <span class="an"><span class="ph">[année]</span></span></p>' +
+            '<p class="cart-titre-m">' + ph('[Titre à fournir]', simuO(o, 'titre'), '', ' data-m="titre"') + ' <span class="an">' + ph('[année]', simuO(o, 'annee'), '', ' data-m="annee"') + '</span></p>' +
             '<p class="cart-ligne"><span><span data-m="type">' + esc(o.type) + '</span> · <span data-m="statut">' + statut(o) + '</span></span>' +
               '<a class="cart-voir" data-m="voir" href="' + lienOeuvre(o) + '"><span>Voir l\'œuvre</span> <span aria-hidden="true">→</span></a></p>' +
           '</div>' +
@@ -435,13 +500,14 @@
         '<div class="pres-g">' +
           '<figure class="pres-portrait"><img src="img/portrait-armel.jpg" alt="Portrait d\'Armel Promeneur, chapeau et lunettes rondes" width="1110" height="1110" loading="lazy" decoding="async" data-rv="clip"></figure>' +
           '<div class="pres-c">' +
-            '<p class="pres-acc"><span class="ph">[accroche provisoire, à valider avec Armel]</span></p>' +
-            '<p class="pres-txt"><span class="ph d-only">[Deux ou trois phrases de présentation, à écrire avec Armel&#8239;: son parcours, ses techniques, ce qui le guide.]</span><span class="ph m-only">[Deux ou trois phrases de présentation, à écrire avec Armel.]</span></p>' +
+            '<p class="pres-acc">' + ph('[accroche provisoire, à valider avec Armel]', simuT('presAccroche')) + '</p>' +
+            '<p class="pres-txt">' + ph('[Deux ou trois phrases de présentation, à écrire avec Armel&#8239;: son parcours, ses techniques, ce qui le guide.]', simuT('presTexte'), 'd-only') +
+              ph('[Deux ou trois phrases de présentation, à écrire avec Armel.]', simuT('presTexteCourt') != null ? simuT('presTexteCourt') : simuT('presTexte'), 'm-only') + '</p>' +
             '<a class="lien-s pres-lien" href="#/a-propos">Découvrir Armel <span aria-hidden="true">→</span></a>' +
             '<dl class="faits">' +
               '<div><dt class="mono">Pratique</dt><dd>Peinture, collage, sculpture, dessin</dd></div>' +
               '<div><dt class="mono">Origine</dt><dd>Guadeloupe</dd></div>' +
-              '<div><dt class="mono">Vit et travaille</dt><dd>En Suisse, <span class="ph">[ville]</span></dd></div>' +
+              '<div><dt class="mono">Vit et travaille</dt><dd>En Suisse, ' + ph('[ville]', simuT('ville')) + '</dd></div>' +
               '<div><dt class="mono">Expositions</dt><dd>Pop-up Pepeuf, Markthalle Basel, juin 2026</dd></div>' +
             '</dl>' +
           '</div>' +
@@ -613,6 +679,8 @@
       $$('[data-h="voir"]', hero).forEach(function (a) { a.href = lienOeuvre(heros); });
       $('[data-h="type"]', hero).textContent = heros.type;
       $('[data-h="statut"]', hero).innerHTML = statut(heros);
+      majSv($('[data-h="titre"]', hero), simuO(heros, 'titre'));
+      majSv($('[data-h="annee"]', hero), simuO(heros, 'annee'));
     }
     var cartAn = [], cartJeton = 0;
     function cartelVers() {
@@ -853,6 +921,8 @@
       $('[data-m="type"]', cm).textContent = x.type;
       $('[data-m="statut"]', cm).innerHTML = statut(x);
       $('[data-m="voir"]', cm).href = lienOeuvre(x);
+      majSv($('[data-m="titre"]', cm), simuO(x, 'titre'));
+      majSv($('[data-m="annee"]', cm), simuO(x, 'annee'));
     }
     // Les voisines se chargent d'avance (2 avant, 3 après). Prête hors de l'écran : montrée d'un coup, sans fondu,
     // elle entre déjà dessinée. Le tapis attend une image pas encore prête (garde) : jamais de trou.
@@ -1133,8 +1203,8 @@
     var liste = ordre.filter(function (o) { return (e.cat === 'toutes' || o.cat === e.cat) && (!e.dispo || dispo(o)); });
 
     var intro = e.vue === 'index'
-      ? '<b>24 œuvres</b> en liste, par numéro. Titre, année, dimensions <span class="ph">[et prix, si à vendre]</span> d\'un coup d\'œil.'
-      : '<b>24 œuvres</b>&#8239;: peintures, collages, sculptures et dessins. <span class="ph">[Pièces uniques&#8239;? à confirmer]</span>';
+      ? '<b>24 œuvres</b> en liste, par numéro. Titre, année, dimensions ' + ph('[et prix, si à vendre]', simuT('indexEtPrix')) + ' d\'un coup d\'œil.'
+      : '<b>24 œuvres</b>&#8239;: peintures, collages, sculptures et dessins. ' + ph('[Pièces uniques&#8239;? à confirmer]', simuT('galeriePiecesUniques'));
 
     var res;
     if (!liste.length) {
@@ -1148,14 +1218,14 @@
           return '<a class="ligne" href="' + lienOeuvre(o) + '" data-n="' + o.n + '">' +
             '<span class="mono l-n">' + o.n + '</span>' +
             '<span class="vign"><img src="' + vignette(o) + '" alt="" width="' + o.w + '" height="' + o.h + '" loading="lazy" decoding="async"></span>' +
-            '<span class="l-t"><span class="ph">[Titre à fournir]</span> <span class="l-fl" aria-hidden="true">→</span><span class="mono l-type">' + esc(o.type) + '</span></span>' +
-            '<span class="phl l-y">[—]</span><span class="phl l-d">[— × — cm]</span>' +
+            '<span class="l-t">' + ph('[Titre à fournir]', simuO(o, 'titre')) + ' <span class="l-fl" aria-hidden="true">→</span><span class="mono l-type">' + esc(o.type) + '</span></span>' +
+            ph('[—]', simuO(o, 'annee'), 'l-y', '', 'phl') + ph('[— × — cm]', simuO(o, 'dimensions'), 'l-d', '', 'phl') +
             '<span class="l-p">' + prixCourt(o) + '</span></a>';
         }).join('') +
         '</div>' +
         '<aside class="idx-ap" aria-label="Aperçu de l\'œuvre survolée">' +
           '<div class="ap-mur"><img data-ap="img" src="' + vignette(o0) + '" alt="' + esc(alt(o0)) + '" width="' + o0.w + '" height="' + o0.h + '" style="--r:' + ratio(o0).toFixed(4) + '"></div>' +
-          '<div class="ap-cap"><b><span class="ph">[Titre à fournir]</span></b><span class="mono"><span data-ap="type">' + esc(o0.type) + '</span> · N° <span data-ap="n">' + o0.n + '</span></span></div>' +
+          '<div class="ap-cap"><b>' + ph('[Titre à fournir]', simuO(o0, 'titre'), '', ' data-ap="titre"') + '</b><span class="mono"><span data-ap="type">' + esc(o0.type) + '</span> · N° <span data-ap="n">' + o0.n + '</span></span></div>' +
           '<p class="mono ap-note">Survolez une ligne pour voir l\'œuvre en grand, entière.</p>' +
         '</aside></div>';
     } else {
@@ -1210,6 +1280,7 @@
             img.style.setProperty('--r', ratio(o).toFixed(4));
             $('[data-ap="n"]', ap).textContent = o.n;
             $('[data-ap="type"]', ap).textContent = o.type;
+            majSv($('[data-ap="titre"]', ap), simuO(o, 'titre'));
           };
           lst.addEventListener('pointerover', majAp);
           lst.addEventListener('focusin', majAp);
@@ -1240,7 +1311,8 @@
       ? '<div class="fi-prix"><span class="mono">Prix</span><span class="fi-prix-v">' + chf(o.prix) + '</span></div><p class="fi-note">' + ref + '<span class="ex">Prix d\'exemple</span></p>'
       : '<div class="fi-prix"><span class="mono">Prix</span><span class="fi-prix-v">' + PASTILLE + 'Vendue' + EX + '</span></div><p class="fi-note">' + ref + '</p>';
 
-    var ligneTab = function (th, td, ph) { return '<tr><th scope="row">' + th + '</th><td>' + (ph ? '<span class="ph">' + td + '</span>' : td) + '</td></tr>'; };
+    var ligneTab = function (th, td) { return '<tr><th scope="row">' + th + '</th><td>' + td + '</td></tr>'; };
+    var so = function (k) { return simuO(o, k); };
 
     var html =
       '<div class="wrap">' +
@@ -1261,34 +1333,34 @@
             '<div class="fi-vues" role="group" aria-label="Vues de l\'œuvre">' +
               '<button type="button" class="vue-b vue1" data-vue="oeuvre" aria-pressed="true" aria-label="Vue entière de l\'œuvre"><img src="' + vignette(o) + '" alt="" width="' + o.w + '" height="' + o.h + '"></button>' +
               ['detail', 'signature', 'echelle'].map(function (t) {
-                return '<button type="button" class="vue-b vue-sim' + (ctoHaut(o, t) ? ' cto-haut' : '') + '" data-vue="' + t + '" aria-pressed="false">' + simHtml(o, t, false) + cartouche(o, t, false) + '</button>';
+                return '<button type="button" class="vue-b vue-sim' + (ctoHaut(o, t) ? ' cto-haut' : '') + (t === 'signature' && sigCachee(o) ? ' sig-cache' : '') + '" data-vue="' + t + '" aria-pressed="false">' + simHtml(o, t, false) + cartouche(o, t, false) + '</button>';
               }).join('') +
             '</div>' +
           '</div>' +
           '<div class="fi-info">' +
             '<p class="mono fi-k">' + esc(o.type) + '</p>' +
-            '<h1 tabindex="-1"><span class="ph">[Titre à fournir]</span></h1>' +
-            '<p>Armel Promeneur, <span class="ph">[année]</span></p>' +
+            '<h1 tabindex="-1">' + ph('[Titre à fournir]', so('titre')) + '</h1>' +
+            '<p>Armel Promeneur, ' + ph('[année]', so('annee')) + '</p>' +
             '<table class="fi-tab"><tbody>' +
-              ligneTab('Technique', '[à fournir]', true) +
-              ligneTab('Support', '[papier, toile, carton&#8239;?]', true) +
-              ligneTab('Dimensions', '[H × L cm]', true) +
-              ligneTab('Édition', '[pièce unique, signée&#8239;?]', true) +
-              ligneTab('Encadrement', '[encadrée ou non]', true) +
-              ligneTab('Statut', statut(o), false) +
+              ligneTab('Technique', ph('[à fournir]', so('technique'))) +
+              ligneTab('Support', ph('[papier, toile, carton&#8239;?]', so('support'))) +
+              ligneTab('Dimensions', ph('[H × L cm]', so('dimensions'))) +
+              ligneTab('Édition', ph('[pièce unique, signée&#8239;?]', so('edition'))) +
+              ligneTab('Encadrement', ph('[encadrée ou non]', so('encadrement'))) +
+              ligneTab('Statut', statut(o)) +
             '</tbody></table>' +
             prix +
             '<div class="fi-btns">' + boutons + '</div>' +
             // Liste de confiance : rien n'est confirmé par Armel, tout reste provisoire
             '<ul class="fi-conf">' +
-              '<li><span class="ph">[Original signé&#8239;? à confirmer]</span></li>' +
-              '<li><span class="ph">[Certificat d\'authenticité&#8239;? à confirmer]</span></li>' +
-              '<li><span class="ph">[Retrait ou envoi&#8239;: à définir]</span></li>' +
+              '<li>' + ph('[Original signé&#8239;? à confirmer]', simuT('originalSigne')) + '</li>' +
+              '<li>' + ph('[Certificat d\'authenticité&#8239;? à confirmer]', simuT('certificat')) + '</li>' +
+              '<li>' + ph('[Retrait ou envoi&#8239;: à définir]', simuT('retraitEnvoi')) + '</li>' +
             '</ul>' +
             '<div class="fi-det">' +
-              '<details><summary><span>À propos de l\'œuvre</span><span class="plus" aria-hidden="true"></span></summary><p><span class="ph d-only">[Quelques lignes d\'Armel sur cette œuvre&#8239;: ce qu\'elle montre, comment elle est faite.]</span><span class="ph m-only">[Quelques lignes d\'Armel sur cette œuvre.]</span></p></details>' +
-              '<details><summary><span>Livraison et retrait</span><span class="plus" aria-hidden="true"></span></summary><p><span class="ph d-only">[À définir avec Armel&#8239;: envoi en Suisse et à l\'étranger, emballage, retrait sur place.]</span><span class="ph m-only">[À définir avec Armel.]</span></p></details>' +
-              '<details><summary><span>Paiement, certificat et retours</span><span class="plus" aria-hidden="true"></span></summary><p><span class="ph d-only">[À définir&#8239;: moyens de paiement, certificat d\'authenticité, conditions de retour.]</span><span class="ph m-only">[À définir avec Armel.]</span></p></details>' +
+              '<details><summary><span>À propos de l\'œuvre</span><span class="plus" aria-hidden="true"></span></summary><p>' + ph('[Quelques lignes d\'Armel sur cette œuvre&#8239;: ce qu\'elle montre, comment elle est faite.]', so('texte'), 'd-only') + ph('[Quelques lignes d\'Armel sur cette œuvre.]', so('texte'), 'm-only') + '</p></details>' +
+              '<details><summary><span>Livraison et retrait</span><span class="plus" aria-hidden="true"></span></summary><p>' + ph('[À définir avec Armel&#8239;: envoi en Suisse et à l\'étranger, emballage, retrait sur place.]', simuT('livraison'), 'd-only') + ph('[À définir avec Armel.]', simuT('livraison'), 'm-only') + '</p></details>' +
+              '<details><summary><span>Paiement, certificat et retours</span><span class="plus" aria-hidden="true"></span></summary><p>' + ph('[À définir&#8239;: moyens de paiement, certificat d\'authenticité, conditions de retour.]', simuT('paiement'), 'd-only') + ph('[À définir avec Armel.]', simuT('paiement'), 'm-only') + '</p></details>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -1404,37 +1476,37 @@
             '<h1 tabindex="-1" data-rv="lignes">' + lignes(['Peintre et sculpteur,', 'de la Guadeloupe', 'à la Suisse.']) + '</h1>' +
             '<table class="tab"><tbody>' +
               '<tr><th scope="row">Origine</th><td>Guadeloupe</td></tr>' +
-              '<tr><th scope="row">Vit et travaille</th><td>En Suisse, <span class="ph">[ville à fournir]</span></td></tr>' +
+              '<tr><th scope="row">Vit et travaille</th><td>En Suisse, ' + ph('[ville à fournir]', simuT('ville')) + '</td></tr>' +
               '<tr><th scope="row">Pratique</th><td>Peinture, collage, sculpture sur bois, dessin</td></tr>' +
-              '<tr><th scope="row">Expositions</th><td>Pop-up Pepeuf, Markthalle Basel, 22–28 juin 2026<br><span class="ph">[autres expositions à fournir]</span></td></tr>' +
+              '<tr><th scope="row">Expositions</th><td>Pop-up Pepeuf, Markthalle Basel, 22–28 juin 2026<br>' + ph('[autres expositions à fournir]', simuT('expositions')) + '</td></tr>' +
               '<tr><th scope="row">Instagram</th><td>' + lienInsta() + '</td></tr>' +
             '</tbody></table>' +
-            '<p class="ap-bio"><span class="ph">[Biographie à écrire avec Armel, cinq à huit lignes&#8239;: son parcours, ses techniques, les artistes qui l\'inspirent (il a signé des hommages à Wifredo Lam et à Picasso).]</span></p>' +
+            '<p class="ap-bio">' + ph('[Biographie à écrire avec Armel, cinq à huit lignes&#8239;: son parcours, ses techniques, les artistes qui l\'inspirent (il a signé des hommages à Wifredo Lam et à Picasso).]', simuT('bio')) + '</p>' +
           '</div>' +
         '</section>' +
         // Citation d'Armel en grand
         '<figure class="ap-cit">' +
-          '<blockquote><p data-rv>«&#8239;<span class="ph">[Une phrase d\'Armel sur son travail, à fournir]</span>&#8239;»</p></blockquote>' +
+          '<blockquote><p data-rv>«&#8239;' + ph('[Une phrase d\'Armel sur son travail, à fournir]', simuT('citation')) + '&#8239;»</p></blockquote>' +
           '<figcaption class="mono">Armel Promeneur</figcaption>' +
         '</figure>' +
         // Intertitres courts, une œuvre en grand entre deux paragraphes ; les photos d'atelier ne mènent à aucune fiche
         '<section class="ap-recit" aria-label="Son travail">' +
           '<div class="ap-r">' +
-            '<div class="ap-r-t"><h2 data-rv>Le trait</h2><p><span class="ph">[Quelques lignes d\'Armel sur le dessin et la peinture, à écrire avec lui.]</span></p></div>' +
+            '<div class="ap-r-t"><h2 data-rv>Le trait</h2><p>' + ph('[Quelques lignes d\'Armel sur le dessin et la peinture, à écrire avec lui.]', simuT('trait')) + '</p></div>' +
             photo('atelier-peinture.jpg', 1440, 1440, 'Armel Promeneur peignant un grand portrait', 'La peinture, en grand format') +
           '</div>' +
           '<div class="ap-r ap-r-inv">' +
             '<a class="ap-r-o" href="' + lienOeuvre(oc) + '"><img src="' + grande(oc) + '" alt="' + esc(alt(oc)) + '" width="' + oc.w + '" height="' + oc.h + '" loading="lazy" decoding="async" data-rv></a>' +
-            '<div class="ap-r-t"><h2 data-rv>Le collage</h2><p><span class="ph">[Quelques lignes d\'Armel sur le collage, à écrire avec lui.]</span></p>' +
-              '<p class="ap-r-leg mono">' + esc(oc.type) + ' · <span class="ph">[Titre à fournir]</span></p>' +
+            '<div class="ap-r-t"><h2 data-rv>Le collage</h2><p>' + ph('[Quelques lignes d\'Armel sur le collage, à écrire avec lui.]', simuT('collage')) + '</p>' +
+              '<p class="ap-r-leg mono">' + esc(oc.type) + ' · ' + ph('[Titre à fournir]', simuO(oc, 'titre')) + '</p>' +
               '<a class="lien-s" href="' + lienOeuvre(oc) + '">Voir cette œuvre <span aria-hidden="true">→</span></a></div>' +
           '</div>' +
           '<div class="ap-r">' +
-            '<div class="ap-r-t"><h2 data-rv>Le bois</h2><p><span class="ph">[Quelques lignes d\'Armel sur la sculpture sur bois, à écrire avec lui.]</span></p></div>' +
+            '<div class="ap-r-t"><h2 data-rv>Le bois</h2><p>' + ph('[Quelques lignes d\'Armel sur la sculpture sur bois, à écrire avec lui.]', simuT('bois')) + '</p></div>' +
             photo('atelier-bois.jpg', 1080, 1080, 'Armel Promeneur travaillant le bois dehors, dans un jardin', '') +
           '</div>' +
           '<div class="ap-r ap-r-expo">' +
-            photo('exposition-minoterie.jpg', 1080, 1294, 'Une œuvre d\'Armel Promeneur accrochée au mur d\'une salle', 'Accrochage <span class="ph">[lieu et date à fournir]</span>') +
+            photo('exposition-minoterie.jpg', 1080, 1294, 'Une œuvre d\'Armel Promeneur accrochée au mur d\'une salle', 'Accrochage ' + ph('[lieu et date à fournir]', simuT('accrochage'))) +
           '</div>' +
         '</section>' +
       '</div>';
@@ -1475,18 +1547,18 @@
             '<section id="impressum" aria-labelledby="imp-titre">' +
               '<h2 id="imp-titre" tabindex="-1">Impressum</h2>' +
               '<div class="lg-cols">' +
-                '<div><p class="mono">Responsable du site</p><p><strong>Armel Promeneur</strong> <span class="ph">[nom civil, si différent du nom d\'artiste]</span><br>Peintre et sculpteur<br><span class="ph">[adresse postale à fournir]</span><br><span class="ph">[NPA, localité]</span></p></div>' +
-                '<div><p class="mono">Contact</p><p><span class="ph">[e-mail à fournir]</span><br>Instagram ' + lienInsta() + '</p></div>' +
+                '<div><p class="mono">Responsable du site</p><p><strong>Armel Promeneur</strong> ' + ph('[nom civil, si différent du nom d\'artiste]', simuT('nomCivil')) + '<br>Peintre et sculpteur<br>' + ph('[adresse postale à fournir]', simuT('adresse')) + '<br>' + ph('[NPA, localité]', simuT('npaLocalite')) + '</p></div>' +
+                '<div><p class="mono">Contact</p><p>' + ph('[e-mail à fournir]', simuT('email')) + '<br>Instagram ' + lienInsta() + '</p></div>' +
               '</div>' +
               '<h3>Registre du commerce</h3>' +
-              '<p><span class="ph">[Aucune inscription trouvée sur Zefix&#8239;: indiquer le numéro IDE s\'il existe, sinon retirer ce paragraphe.]</span></p>' +
+              '<p>' + ph('[Aucune inscription trouvée sur Zefix&#8239;: indiquer le numéro IDE s\'il existe, sinon retirer ce paragraphe.]', simuT('ide')) + '</p>' +
               '<h3>Conception du site</h3>' +
               '<p>CyberActivities, Dylan Borcard, Fribourg.</p>' +
               '<h3>Droits d\'auteur</h3>' +
-              '<p>Les œuvres, les photos et les textes de ce site appartiennent à Armel Promeneur, sauf mention contraire <span class="ph">[auteur des photos à confirmer]</span>. Leur reproduction demande son accord écrit.</p>' +
+              '<p>Les œuvres, les photos et les textes de ce site appartiennent à Armel Promeneur, sauf mention contraire ' + ph('[auteur des photos à confirmer]', simuT('auteurPhotos')) + '. Leur reproduction demande son accord écrit.</p>' +
               '<h3>Prix et vente</h3>' +
-              '<p><span class="ph">[Si les œuvres se vendent par le site&#8239;:]</span> les prix sont indiqués en francs suisses (CHF) et sont les prix effectivement à payer&#8239;; les frais de livraison <span class="ph">[sont indiqués avant la commande]</span>. La disponibilité d\'une œuvre unique vous est confirmée à la commande.</p>' +
-              '<p><span class="ph">[Conditions de vente&#8239;: lien vers la page CGV, à rédiger.]</span></p>' +
+              '<p>' + ph('[Si les œuvres se vendent par le site&#8239;:]', simuT('siVente')) + deux(' les' + PRIX_TXT, 'Les' + PRIX_TXT) + ph('[sont indiqués avant la commande]', simuT('fraisLivraison')) + '. La disponibilité d\'une œuvre unique vous est confirmée à la commande.</p>' +
+              '<p>' + ph('[Conditions de vente&#8239;: lien vers la page CGV, à rédiger.]', simuT('cgv')) + '</p>' +
               '<h3>Responsabilité</h3>' +
               '<p>Les informations de ce site sont soignées et tenues à jour, mais des erreurs restent possibles. Le lien vers Instagram mène à un autre site, dont le contenu ne dépend pas d\'Armel Promeneur.</p>' +
             '</section>' +
@@ -1494,38 +1566,38 @@
               '<h2 id="pd-titre" tabindex="-1">Protection des données</h2>' +
               '<p style="margin-top:16px">Cette déclaration explique comment Armel Promeneur traite vos données personnelles, selon la loi fédérale sur la protection des données (LPD).</p>' +
               '<h3>Qui est responsable&#8239;?</h3>' +
-              '<p>Armel Promeneur, <span class="ph">[adresse postale à fournir]</span>, <span class="ph">[e-mail à fournir]</span>.</p>' +
+              '<p>Armel Promeneur, ' + ph('[adresse postale à fournir]', adressePd()) + ', ' + ph('[e-mail à fournir]', simuT('email')) + '.</p>' +
               '<h3>Quelles données, et pourquoi&#8239;?</h3>' +
               '<ul>' +
                 '<li><strong>Formulaire de contact&#8239;:</strong> votre nom, votre e-mail, votre téléphone si vous le donnez, l\'œuvre qui vous intéresse et votre message. Ils servent à vous répondre.</li>' +
-                '<li><strong>Achat d\'une œuvre</strong> <span class="ph">[si la vente passe par le site]</span>&#8239;: en plus, votre adresse de livraison et les données de la commande, pour vous livrer et établir la facture. <span class="ph">[Moyen de paiement à définir&#8239;: s\'il passe par un prestataire, le nommer ici.]</span></li>' +
+                '<li><strong>Achat d\'une œuvre</strong> ' + ph('[si la vente passe par le site]', simuT('siVenteAchat')) + '&#8239;: en plus, votre adresse de livraison et les données de la commande, pour vous livrer et établir la facture. ' + ph('[Moyen de paiement à définir&#8239;: s\'il passe par un prestataire, le nommer ici.]', simuT('moyenPaiement')) + '</li>' +
                 '<li><strong>Visite du site&#8239;:</strong> comme tout site, le serveur enregistre des données techniques (adresse IP, date et heure, page consultée, type de navigateur). Elles servent seulement à faire fonctionner le site et à le protéger contre les abus.</li>' +
               '</ul>' +
               '<p>Vos données ne servent pas à de la publicité et ne sont pas vendues.</p>' +
               '<h3>Cookies et outils de suivi</h3>' +
-              '<p>Ce site n\'utilise ni cookie publicitaire, ni outil de mesure d\'audience, ni bouton de réseau social. <span class="ph">[Si la vente passe par le site&#8239;: seuls des cookies techniques, nécessaires au panier et au paiement.]</span> <span class="ph">[Les polices d\'écriture sont hébergées sur le serveur du site.]</span> Le lien Instagram n\'ouvre Instagram que si vous cliquez&#8239;: Meta traite alors vos données selon ses propres règles.</p>' +
+              '<p>Ce site n\'utilise ni cookie publicitaire, ni outil de mesure d\'audience, ni bouton de réseau social. ' + ph('[Si la vente passe par le site&#8239;: seuls des cookies techniques, nécessaires au panier et au paiement.]', simuT('cookiesVente')) + ' ' + ph('[Les polices d\'écriture sont hébergées sur le serveur du site.]', simuT('polices')) + ' Le lien Instagram n\'ouvre Instagram que si vous cliquez&#8239;: Meta traite alors vos données selon ses propres règles.</p>' +
               '<h3>Qui reçoit vos données&#8239;?</h3>' +
               '<ul>' +
                 '<li><strong>Armel Promeneur,</strong> qui lit vos messages et y répond.</li>' +
-                '<li><strong>L\'hébergeur du site</strong> <span class="ph">[en Suisse, à confirmer]</span>, qui garde le site et les messages pour lui, sans les utiliser à ses propres fins.</li>' +
-                '<li><strong>L\'outil d\'envoi du formulaire</strong> <span class="ph">[à confirmer]</span> et <strong>le fournisseur de messagerie</strong> <span class="ph">[à confirmer]</span>.</li>' +
-                '<li><strong>Pour un achat,</strong> <span class="ph">[le prestataire de paiement et le transporteur, à définir]</span>.</li>' +
+                '<li><strong>L\'hébergeur du site</strong> ' + ph('[en Suisse, à confirmer]', simuT('hebergeur')) + ', qui garde le site et les messages pour lui, sans les utiliser à ses propres fins.</li>' +
+                '<li><strong>L\'outil d\'envoi du formulaire</strong> ' + ph('[à confirmer]', simuT('outilForm')) + ' et <strong>le fournisseur de messagerie</strong> ' + ph('[à confirmer]', simuT('messagerie')) + '.</li>' +
+                '<li><strong>Pour un achat,</strong> ' + ph('[le prestataire de paiement et le transporteur, à définir]', simuT('achatPrestataires')) + '.</li>' +
                 '<li><strong>Les autorités,</strong> seulement lorsque la loi l\'exige.</li>' +
               '</ul>' +
               '<h3>Données envoyées à l\'étranger</h3>' +
-              '<p><span class="ph">[À compléter quand les prestataires seront choisis&#8239;: si l\'un d\'eux traite des données hors de Suisse, le nommer avec le pays et la garantie prévue (par exemple Stripe&#8239;: Irlande et États-Unis, Swiss-U.S. Data Privacy Framework, à vérifier avant la mise en ligne). Pour une livraison hors de Suisse, l\'adresse est transmise au transporteur et aux douanes du pays de destination.]</span></p>' +
+              '<p>' + ph('[À compléter quand les prestataires seront choisis&#8239;: si l\'un d\'eux traite des données hors de Suisse, le nommer avec le pays et la garantie prévue (par exemple Stripe&#8239;: Irlande et États-Unis, Swiss-U.S. Data Privacy Framework, à vérifier avant la mise en ligne). Pour une livraison hors de Suisse, l\'adresse est transmise au transporteur et aux douanes du pays de destination.]', simuT('prestataires')) + '</p>' +
               '<h3>Combien de temps&#8239;?</h3>' +
               '<ul>' +
                 '<li>Les messages sont effacés quand ils ne servent plus à vous répondre ni à suivre une vente.</li>' +
-                '<li><span class="ph">[Si Armel établit des factures&#8239;:]</span> les factures et les pièces comptables sont conservées 10 ans, comme la loi l\'exige.</li>' +
-                '<li>Les données techniques des visites sont effacées après <span class="ph">[durée fixée par l\'hébergeur, par exemple 30 jours]</span>.</li>' +
+                '<li>' + ph('[Si Armel établit des factures&#8239;:]', simuT('siFactures')) + deux(' les' + FACT_TXT, 'Les' + FACT_TXT) + '</li>' +
+                '<li>Les données techniques des visites sont effacées après ' + ph('[durée fixée par l\'hébergeur, par exemple 30 jours]', simuT('dureeLogs')) + '.</li>' +
               '</ul>' +
               '<h3>Sécurité</h3>' +
               '<p>Le site est servi en connexion chiffrée (HTTPS). Seules les personnes qui en ont besoin pour vous répondre ont accès à vos messages.</p>' +
               '<h3 id="vos-droits" tabindex="-1">Vos droits</h3>' +
-              '<p>Vous pouvez demander à tout moment quelles données sont conservées sur vous, les faire corriger ou effacer (sauf celles que la loi oblige à garder), et vous opposer à leur traitement. Écrivez à <span class="ph">[e-mail à fournir]</span>. Si la réponse ne vous satisfait pas, vous pouvez le signaler au Préposé fédéral à la protection des données et à la transparence (PFPDT, <a href="https://www.edoeb.admin.ch" target="_blank" rel="noopener">edoeb.admin.ch</a>) ou faire valoir vos droits devant les tribunaux.</p>' +
+              '<p>Vous pouvez demander à tout moment quelles données sont conservées sur vous, les faire corriger ou effacer (sauf celles que la loi oblige à garder), et vous opposer à leur traitement. Écrivez à ' + ph('[e-mail à fournir]', simuT('email')) + '. Si la réponse ne vous satisfait pas, vous pouvez le signaler au Préposé fédéral à la protection des données et à la transparence (PFPDT, <a href="https://www.edoeb.admin.ch" target="_blank" rel="noopener">edoeb.admin.ch</a>) ou faire valoir vos droits devant les tribunaux.</p>' +
               '<h3>Changements</h3>' +
-              '<p>Cette déclaration est adaptée si la façon de faire change. Version du <span class="ph">[date de mise en ligne]</span>.</p>' +
+              '<p>Cette déclaration est adaptée si la façon de faire change. Version du ' + ph('[date de mise en ligne]', simuT('dateVersion')) + '.</p>' +
             '</section>' +
           '</div>' +
         '</div>' +
@@ -1935,6 +2007,90 @@
     var h1 = $('h1', main);
     (h1 || main).focus({ preventScroll: true });
   });
+
+  /* ---------- V7 : bouton « Simulation » (pastille fixe en bas, à droite sur téléphone, à gauche sur ordinateur) ----------
+     Bascule html.simu (le CSS montre les valeurs inventées ou les annotations), sans recharger la page :
+     carrousel, tapis roulant et formulaire continuent. Mémorisé par appareil ; l'état est posé avant le premier
+     affichage par le petit script en tête d'index.html. Cachée quand le menu, la visionneuse ou le message sont ouverts. */
+  var CLE_SIMU = 'armel-proto-simulation';
+  var btnSimu = document.getElementById('simu-btn');
+  if (btnSimu) {
+    btnSimu.setAttribute('aria-pressed', String(simuOn()));
+    appui(btnSimu, false);
+    btnSimu.addEventListener('click', function () {
+      var on = !simuOn();
+      // Les textes changent de hauteur : on garde à sa place ce qu'on regarde. Repère = un petit bloc (paragraphe,
+      // ligne, titre…) au tiers de l'écran, jamais un grand conteneur dont le haut ne bouge pas (Safari n'a pas
+      // l'ancrage de défilement) ; entre deux blocs, on sonde un peu plus bas.
+      var rep = null, y0 = 0;
+      if (window.scrollY > 0 && document.elementFromPoint) {
+        for (var yy = window.innerHeight / 3; !rep && yy < window.innerHeight * 0.75; yy += 20) {
+          rep = document.elementFromPoint(window.innerWidth / 2, yy);
+          rep = rep && rep.closest ? rep.closest('p, li, h1, h2, h3, h4, dt, dd, tr, figcaption, blockquote, label, summary, img') : null;
+          while (rep && rep.closest('.ph, .phl, .sv, .av, .ex')) rep = rep.parentElement;
+        }
+        if (rep) y0 = rep.getBoundingClientRect().top;
+      }
+      document.documentElement.classList.toggle('simu', on);
+      // Fiche : si la vue « Signature » affichée disparaît en simulation, on revient à l'œuvre entière
+      var sigOuverte = $('.vue-b.sig-cache[aria-pressed="true"]', main), vue1 = $('.vue-b.vue1', main);
+      if (on && sigOuverte && vue1) vue1.click();
+      if (rep && document.contains(rep) && rep.getClientRects().length) {
+        var dy = rep.getBoundingClientRect().top - y0;
+        if (Math.abs(dy) >= 1) window.scrollTo(0, window.scrollY + dy);
+      }
+      btnSimu.setAttribute('aria-pressed', String(on));
+      // Menu déroulant du formulaire : « (vendue, exemple) » ou « (vendue) » (le CSS n'atteint pas le texte d'une option)
+      $$('option[data-vendue]').forEach(function (op) { op.textContent = op.textContent.replace(/ \(vendue[^)]*\)$/, '') + libVendue(); });
+      try { window.localStorage.setItem(CLE_SIMU, on ? '1' : '0'); } catch (e) { /* le site marche sans */ }
+      var an = document.getElementById('annonce');
+      if (an) an.textContent = on ? 'Simulation : informations inventées' : 'Annotations affichées';
+      placerSimu();
+    });
+
+    /* La pastille monte quand elle couvrirait un lien, un bouton ou le pied de page (vignettes de la fiche,
+       « Voir les 24 œuvres » du téléphone) : juste au-dessus, 8 px d'écart. Recalculé au défilement, au redimensionnement
+       et quand la page change (pas pendant le carrousel). Les grands liens (cartes, images) ne comptent pas. */
+    var EVITE = 'a[href], button, select, input, textarea, summary, #pied';
+    var simuLeve = 0, simuRaf = 0;
+    var obstacleHaut = function (g, d, h, b) {
+      var haut = null;
+      [g + 2, (g + d) / 2, d - 2].forEach(function (x) {
+        [h + 2, (h + b) / 2, b - 2].forEach(function (y) {
+          if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return;
+          document.elementsFromPoint(x, y).forEach(function (el) {
+            if (btnSimu.contains(el)) return;
+            var c = el.closest(EVITE);
+            if (!c || c.contains(btnSimu)) return;
+            var r = c.getBoundingClientRect();
+            if (r.height <= 200 && (haut === null || r.top < haut)) haut = r.top;
+          });
+        });
+      });
+      return haut;
+    };
+    var placerSimu = function () {
+      simuRaf = 0;
+      var r = btnSimu.getBoundingClientRect();
+      if (!r.width || !document.elementsFromPoint) return;
+      // Position de repos calculée sans la montée (le rectangle bouge pendant la transition)
+      var b = window.innerHeight - (parseFloat(getComputedStyle(btnSimu).bottom) || 0), h = b - btnSimu.offsetHeight, leve = 0;
+      for (var n = 0; n < 6; n++) {
+        var t = obstacleHaut(r.left - 6, r.right + 6, h - leve - 6, b - leve + 6);
+        if (t === null) break;
+        leve = Math.max(leve, b - t + 8);
+        if (leve > window.innerHeight * 0.5) { leve = 0; break; } // pas de place : elle reste dans son coin
+      }
+      if (leve !== simuLeve) { simuLeve = leve; btnSimu.style.setProperty('--leve', -leve + 'px'); }
+    };
+    var placerPlusTard = function () { if (!simuRaf) simuRaf = requestAnimationFrame(placerSimu); };
+    window.addEventListener('scroll', placerPlusTard, { passive: true });
+    window.addEventListener('resize', placerPlusTard);
+    window.addEventListener('load', placerPlusTard);
+    window.addEventListener('hashchange', function () { placerPlusTard(); setTimeout(placerPlusTard, 450); });
+    if ('ResizeObserver' in window) new ResizeObserver(placerPlusTard).observe(document.body);
+    placerPlusTard();
+  }
 
   /* ---------- Message d'accueil de Dylan (fenêtre au milieu de l'écran) ----------
      Une fois par appareil (mémorisé), puis « Relire le message » dans le bandeau le rouvre.
