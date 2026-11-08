@@ -410,11 +410,21 @@
     if (v && (v.oeuvre || v.demande)) preremplir(v.oeuvre, v.demande);
     form$ = {
       preremplir: preremplir,
-      // Fiche œuvre : défile jusqu'au bloc, formulaire prérempli, focus sur « Nom »
+      // Fiche œuvre : formulaire prérempli. Ordinateur : défile jusqu'au bloc, focus sur « Nom ».
+      // Sous 1024 px (bloc empilé) : défile droit au formulaire, sous l'en-tête collé.
+      // Écran tactile : pas de focus, sinon le clavier de l'iPhone s'ouvre et cache le formulaire.
       ouvrir: function (n, d) {
         preremplir(n, d);
-        $('#appel', main).scrollIntoView({ behavior: reduit() ? 'auto' : 'smooth', block: 'start' });
-        nom.focus({ preventScroll: true });
+        var comp = { behavior: reduit() ? 'auto' : 'smooth' };
+        if (window.innerWidth < 1024) {
+          var hd = $('.hd'), haut = hd ? hd.getBoundingClientRect().height : 0;
+          comp.top = Math.max(0, form.getBoundingClientRect().top + window.scrollY - haut - 16);
+          window.scrollTo(comp);
+        } else {
+          comp.block = 'start';
+          $('#appel', main).scrollIntoView(comp);
+        }
+        if (!window.matchMedia('(pointer: coarse)').matches) nom.focus({ preventScroll: true });
       },
       valeurs: function () { return { nom: nom.value, mail: mail.value, oeuvre: sel.value, msg: msg.value, souhait: souhait.value, envoye: form.hidden }; },
       remettre: function (x) { if (x.envoye) return; nom.value = x.nom; mail.value = x.mail; sel.value = x.oeuvre; msg.value = x.msg; souhait.value = x.souhait; }
