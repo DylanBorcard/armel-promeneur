@@ -2045,51 +2045,8 @@
       try { window.localStorage.setItem(CLE_SIMU, on ? '1' : '0'); } catch (e) { /* le site marche sans */ }
       var an = document.getElementById('annonce');
       if (an) an.textContent = on ? 'Simulation : informations inventées' : 'Annotations affichées';
-      placerSimu();
     });
 
-    /* La pastille monte quand elle couvrirait un lien, un bouton ou le pied de page (vignettes de la fiche,
-       « Voir les 24 œuvres » du téléphone) : juste au-dessus, 8 px d'écart. Recalculé au défilement, au redimensionnement
-       et quand la page change (pas pendant le carrousel). Les grands liens (cartes, images) ne comptent pas. */
-    var EVITE = 'a[href], button, select, input, textarea, summary, #pied';
-    var simuLeve = 0, simuRaf = 0;
-    var obstacleHaut = function (g, d, h, b) {
-      var haut = null;
-      [g + 2, (g + d) / 2, d - 2].forEach(function (x) {
-        [h + 2, (h + b) / 2, b - 2].forEach(function (y) {
-          if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return;
-          document.elementsFromPoint(x, y).forEach(function (el) {
-            if (btnSimu.contains(el)) return;
-            var c = el.closest(EVITE);
-            if (!c || c.contains(btnSimu)) return;
-            var r = c.getBoundingClientRect();
-            if (r.height <= 200 && (haut === null || r.top < haut)) haut = r.top;
-          });
-        });
-      });
-      return haut;
-    };
-    var placerSimu = function () {
-      simuRaf = 0;
-      var r = btnSimu.getBoundingClientRect();
-      if (!r.width || !document.elementsFromPoint) return;
-      // Position de repos calculée sans la montée (le rectangle bouge pendant la transition)
-      var b = window.innerHeight - (parseFloat(getComputedStyle(btnSimu).bottom) || 0), h = b - btnSimu.offsetHeight, leve = 0;
-      for (var n = 0; n < 6; n++) {
-        var t = obstacleHaut(r.left - 6, r.right + 6, h - leve - 6, b - leve + 6);
-        if (t === null) break;
-        leve = Math.max(leve, b - t + 8);
-        if (leve > window.innerHeight * 0.5) { leve = 0; break; } // pas de place : elle reste dans son coin
-      }
-      if (leve !== simuLeve) { simuLeve = leve; btnSimu.style.setProperty('--leve', -leve + 'px'); }
-    };
-    var placerPlusTard = function () { if (!simuRaf) simuRaf = requestAnimationFrame(placerSimu); };
-    window.addEventListener('scroll', placerPlusTard, { passive: true });
-    window.addEventListener('resize', placerPlusTard);
-    window.addEventListener('load', placerPlusTard);
-    window.addEventListener('hashchange', function () { placerPlusTard(); setTimeout(placerPlusTard, 450); });
-    if ('ResizeObserver' in window) new ResizeObserver(placerPlusTard).observe(document.body);
-    placerPlusTard();
   }
 
   /* ---------- Message d'accueil de Dylan (fenêtre au milieu de l'écran) ----------

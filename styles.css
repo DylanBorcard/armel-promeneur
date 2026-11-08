@@ -1077,7 +1077,7 @@ html.simu .vue-b.sig-cache { display: none; }
 /* Pastille « Simulation » : fixe en bas à droite sur téléphone et tablette (seul coin libre), en bas à gauche sur
    ordinateur (dès 1024 px) : mesuré de 1024 à 1920 px, ce coin est dégagé à la première vue de toutes les pages
    (navigation et cartel de l'accueil, « Acheter » de la fiche, contact), alors qu'à droite elle couvrait « Acheter »
-   à 1366×768. Quand un lien ou un bouton passe dessous (pied de page…), app.js la fait monter (--leve).
+   à 1366×768. Immobile (V7.1, choix de Dylan) : le pied de page garde une marge basse pour ne rien cacher.
    Au-dessus du contenu et de l'en-tête, sous le menu, la visionneuse et le message (cachée quand ils sont ouverts). */
 .simu-btn {
   position: fixed; right: 24px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 100;
@@ -1085,8 +1085,7 @@ html.simu .vue-b.sig-cache { display: none; }
   border: 1px solid rgba(17,17,17,.12); border-radius: 19px; background: #fff; color: var(--noir);
   font: 500 12.5px/1 var(--f-petit); letter-spacing: .01em; cursor: pointer;
   box-shadow: var(--bouton-ombre); -webkit-tap-highlight-color: transparent;
-  translate: 0 var(--leve, 0px);  /* --leve : posé par app.js quand la pastille monte au-dessus d'un lien ou d'un bouton */
-  transition: transform var(--fl-retour-duree) var(--e-ressort), translate .25s var(--e-ui), background-color .2s var(--e-ui), color .2s var(--e-ui);
+  transition: transform var(--fl-retour-duree) var(--e-ressort), background-color .2s var(--e-ui), color .2s var(--e-ui);
 }
 .simu-btn::after { content: ""; position: absolute; inset: -4px; }  /* cible tactile de 46 px */
 .simu-btn.appuye { transform: scale(var(--fl-appui)); transition-duration: var(--fl-appui-duree); }
@@ -1105,6 +1104,8 @@ html.bloque .simu-btn { display: none; }
   .simu-btn::after { inset: -5px; }  /* 46 px */
 }
 @media (min-width: 1024px) { .simu-btn { right: auto; left: 24px; } }
+/* Pastille immobile (V7.1) : marge sous le pied de page pour qu'elle ne cache rien tout en bas */
+.pied { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 @media print { .simu-btn { display: none; } }
 
 /* ---------- Mouvements réduits : tout mouvement coupé ---------- */
