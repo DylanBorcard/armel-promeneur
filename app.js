@@ -1,6 +1,7 @@
-/* Prototype du site d'Armel Promeneur (V5) — JavaScript sans framework ni bibliothèque.
-   V5 (téléphone et tablette seulement) : rangée de l'accueil qui défile toute seule en boucle, photos en fondu
-   une fois décodées, plus de dévoilement par clip-path ni de glissement d'indice. L'ordinateur ne change pas.
+/* Prototype du site d'Armel Promeneur (V6) — JavaScript sans framework ni bibliothèque.
+   V6 (téléphone et tablette seulement) : la rangée de l'accueil devient un tapis roulant continu (l'œuvre du milieu
+   en grand, un bout des voisines), en-tête à fond plein. V5 : photos en fondu une fois décodées, plus de dévoilement
+   par clip-path ni de glissement d'indice. L'ordinateur ne change pas.
    Routage par hash (#/galerie, #/oeuvre/07…), marche aussi ouvert en file://.
    Les données viennent de data.js (window.SITE). Rien n'est envoyé sur internet.
    Mouvement : seulement transform, opacity et clip-path ; tout est coupé si prefers-reduced-motion. */
@@ -64,14 +65,16 @@
   var E_ENTREE = 'cubic-bezier(.22,1,.36,1)';
   var E_UI = 'cubic-bezier(.4,0,.2,1)';
   var DUREE_OEUVRE = 6000; // accueil sur ordinateur : 6 s par œuvre
-  var DUREE_TEL = 5000;    // accueil sur téléphone et tablette : 5 s par œuvre (et reprise 5 s après un geste)
+  // Accueil sur téléphone et tablette : tapis roulant continu. VITESSE : une œuvre passe au milieu toutes les
+  // DEFILE_TEL secondes (plus grand = plus lent). Le tapis repart REPRISE_TEL ms après le dernier geste.
+  var DEFILE_TEL = 5.5;
+  var REPRISE_TEL = 5000;
 
   var main = document.getElementById('contenu');
   var pied = document.getElementById('pied');
   var mqReduit = window.matchMedia('(prefers-reduced-motion: reduce)');
   var mqOrdi = window.matchMedia('(min-width: 1024px)');
   function reduit() { return mqReduit.matches; }
-  var defilePage = -1e9; // moment du dernier défilement de la page
 
   /* ---------- Petits outils ---------- */
   function noop() {}
@@ -358,6 +361,8 @@
   var carArret = false;    // défilement automatique arrêté pour de bon (premier geste ou tour complet)
   var car = null;         // carrousel de la page en cours
   var pauseManuelle = false; // Pause mise à la main : gardée pendant la visite (retour sur l'accueil compris)
+  var retourTel = false;     // téléphone : on revient d'une fiche (le tapis attend avant de repartir)
+  var focusScript = false;   // focus posé par le routeur (retour d'une fiche) : ni clavier ni lecteur d'écran
 
   function pageAccueil() {
     var o = heros || PAR_N[SITE.phare] || LISTE[0];
@@ -401,23 +406,20 @@
             '<a class="cart-voir" data-h="voir" href="' + lienOeuvre(o) + '"><span>Voir l\'œuvre</span> <span aria-hidden="true">→</span></a>' +
           '</div>' +
         '</div>' +
-        // Téléphone et tablette (V5) : rangée native qui défile toute seule et qu'on fait glisser.
-        // Trois copies de la liste (boucle sans fin) ; seule celle du milieu est lue et atteinte au clavier.
-        // Images de 720 px (assez pour un téléphone), emplacement à la largeur de l'œuvre (--r = largeur / hauteur).
+        // Téléphone et tablette (V6) : tapis roulant. Une seule copie de la liste, à partir de l'œuvre du héros ;
+        // les œuvres sont posées et déplacées par brancherCarrousel(). Images de 720 px (assez pour un téléphone),
+        // emplacement à la largeur de l'œuvre (--r = largeur / hauteur).
         '<div class="hero-m">' +
-          '<div class="rangee" tabindex="0" role="group" aria-label="Œuvres à la une&#8239;: faites glisser pour voir la suivante">' +
-            [0, 1, 2].map(function (c) {
-              return rangee.map(function (x, i) {
-                var vraie = c === 1;
-                return '<a class="r-it" href="' + lienOeuvre(x) + '" data-n="' + x.n + '" style="--r:' + ratio(x).toFixed(4) + '"' + (vraie ? '' : ' tabindex="-1" aria-hidden="true"') + '>' +
-                  '<span class="r-cad"><img src="' + vignette(x) + '" alt="' + (vraie ? esc(alt(x)) : '') + '" width="' + x.w + '" height="' + x.h + '"' +
-                  // (lazy partout : sur l'ordinateur la rangée est cachée et ne charge rien ; pas de decoding="async",
-                  //  l'image est déjà décodée quand on la montre)
-                  (vraie && i === 0 ? ' fetchpriority="high"' : '') + ' loading="lazy"></span></a>';
-              }).join('');
+          '<div class="rangee" role="group" aria-label="Œuvres à la une&#8239;: faites glisser pour en voir d\'autres">' +
+            rangee.map(function (x, i) {
+              return '<a class="r-it" href="' + lienOeuvre(x) + '" data-n="' + x.n + '" style="--r:' + ratio(x).toFixed(4) + '">' +
+                '<span class="r-cad"><img src="' + vignette(x) + '" alt="' + esc(alt(x)) + '" width="' + x.w + '" height="' + x.h + '"' +
+                // (lazy partout : sur l'ordinateur la rangée est cachée et ne charge rien ; pas de decoding="async",
+                //  l'image est déjà décodée quand on la montre)
+                (i === 0 ? ' fetchpriority="high"' : '') + ' loading="lazy"></span></a>';
             }).join('') +
           '</div>' +
-          '<div class="r-barre" aria-hidden="true"><span class="r-pos" style="width:calc(100% / ' + TOTAL + ')"></span></div>' +
+          '<div class="r-barre" aria-hidden="true"><span class="r-pos" style="width:calc(100% / ' + TOTAL + ');--nb:' + TOTAL + '"></span></div>' +
           '<div class="cartel-m" aria-live="polite">' +
             '<p class="cart-titre-m"><span class="ph">[Titre à fournir]</span> <span class="an"><span class="ph">[année]</span></span></p>' +
             '<p class="cart-ligne"><span><span data-m="type">' + esc(o.type) + '</span> · <span data-m="statut">' + statut(o) + '</span></span>' +
@@ -470,7 +472,7 @@
      posés en absolu dans la scène et déplacés seulement par transform (translateX + scale) et opacity.
      Les transitions CSS se reprennent d'où elles sont : un clic pendant un mouvement repart sans saut.
      Réglages (durées, courbes, échelles, opacités) : variables --ca-*, --cartel-*, --fl-* en tête de styles.css.
-     Téléphone : rangée native à faire glisser. */
+     Téléphone et tablette : tapis roulant continu (plus bas). */
   function brancherCarrousel() {
     var hero = $('.hero', main);
     var sc = $('.scene', hero), cartel = $('.cartel', hero), ctl = $('[data-h="ctl"]', hero);
@@ -750,177 +752,324 @@
       roS.observe(zone);
       nettoyage.push(function () { roS.disconnect(); });
     }
-    /* --- Téléphone et tablette (V5) : rangée native qui défile toute seule (5 s par œuvre) ---
-       Trois copies de la liste : on part de la copie du milieu. Une fois la rangée immobile, si l'on est dans une
-       copie de bord, on saute sans bruit à la même œuvre de la copie du milieu (contenu identique) : la boucle
-       continue vers la droite sans retour visible. Rien ne touche au défilement pendant un geste ou une inertie.
-       Pause pendant le toucher, reprise 5 s après le dernier geste ; pause hors de vue et onglet caché ;
-       départ après « OK » sur le message d'accueil ; rien d'automatique si le mouvement est réduit. */
+    /* --- Téléphone et tablette (V6) : tapis roulant continu ---
+       Une seule copie de la liste. « u » est une position sur la boucle (en px, chaque œuvre comptée à sa taille du
+       milieu) qui avance d'un pas régulier à chaque image ; chaque œuvre est posée par translate3d + scale et opacity
+       selon sa distance au milieu, modulo la longueur de la boucle : ni copie, ni saut, ni défilement natif.
+       (scrollLeft et scroll-snap avancent par pixels entiers à petite vitesse sur iPhone et se battent avec le doigt ;
+       translate3d glisse au sous-pixel, sur la carte graphique.) Les voisines rapetissent et pâlissent avec la
+       distance (--ca-vois-*, comme l'ordinateur) ; à l'écran, l'écart entre deux œuvres reste --ca-ecart.
+       Doigt : arrêt net, glissement libre avec élan, l'œuvre la plus proche se cale au milieu, reprise 5 s après.
+       Aucune image calculée quand la rangée est hors de vue, l'onglet caché, un menu ou une fenêtre ouverts, le
+       message d'accueil pas encore validé, ou le focus clavier dans la rangée ou sur « Voir l'œuvre ».
+       Mouvement réduit : pas de défilement continu ; le doigt et le clavier marchent toujours. */
     var row = $('.rangee', hero), pos = $('.r-pos', hero), cm = $('.cartel-m', hero);
-    var items = $$('.r-it', row), offs = [];
-    var auto = false;     // le défilement en cours vient de nous (glissement automatique ou saut de recentrage)
-    var toucher = false, calme = true, focusR = false, horsVueR = false, pretR = false, depart = false;
-    var repere = performance.now(); // dernier geste ou dernier départ automatique
-    var calmeT = 0, autoT = 0, rafPos = 0, cur = -1;
+    var items = $$('.r-it', row), NB = items.length;
+    var oeuvresT = items.map(function (it) { return PAR_N[it.dataset.n]; }), rangsT = oeuvresT.map(rang);
+    var VOIS_H = reglageCss('--ca-vois-h'), VOIS_MAX = reglageCss('--ca-vois-max'), VOIS_OP = reglageCss('--ca-vois-op');
+    // Mesures : largeur de chaque œuvre au milieu, son centre sur la boucle, son échelle de voisine
+    var larg = [], centre = [], sVois = [], boucle = 0, ecartT = 20, demi = 0, hautT = 0, portee = 1;
+    var pX = [], pS = [], pO = [], ecritT = [], ecritO = [], dedans = [], pretes = [], barre = '';
+    var u = 0, vit = 0, uCible = 0, iCible = -1, cT = -1;
+    var mode = reduit() ? 'arret' : 'auto'; // auto (défile), doigt, ressort (se cale au milieu), arret (attend)
+    var pretT = false, focusK = false, horsVueT = false, attente = false;
+    var rafT = 0, tPrec = 0, repT = 0, doigt = null;
+    var bloque = 0, lance = false, tPointeur = -1e9; // clic bloqué jusqu'à ; élan lancé au doigt ; dernier appui
     function tel() { return !mqOrdi.matches; }
-    // Position de défilement de chaque emplacement (au pixel près : un saut tombe pile sur un point d'arrêt)
-    function mesurer() {
-      if (!items.length) return;
-      var x0 = items[0].getBoundingClientRect().left;
-      offs = items.map(function (it) { return it.getBoundingClientRect().left - x0; });
-    }
-    function indice(x) {
+    function mod(a, b) { return ((a % b) + b) % b; }
+    function lisse(x) { return x >= 1 ? 1 : x * x * (3 - 2 * x); }
+    function omega() { return reduit() ? 20 : 8; } // raideur du ressort (mouvement réduit : il se cale vite)
+    function vitesse() { return boucle / NB / DEFILE_TEL; } // px de boucle par seconde
+    // Distance sur la boucle du centre de l'œuvre i à la position x (entre −boucle/2 et +boucle/2 ; > 0 : à droite)
+    function ecartDe(i, x) { return mod(centre[i] - x + boucle / 2, boucle) - boucle / 2; }
+    function procheDe(x) {
       var k = 0;
-      for (var i = 1; i < offs.length; i++) if (Math.abs(offs[i] - x) < Math.abs(offs[k] - x)) k = i;
+      for (var i = 1; i < NB; i++) if (Math.abs(ecartDe(i, x)) < Math.abs(ecartDe(k, x))) k = i;
       return k;
     }
-    // Le cartel suit l'œuvre affichée (réécrit seulement quand elle change)
-    function afficher(x) {
-      if (!x) return;
-      heros = x; // au retour, la rangée repart de cette œuvre
+    function mesurerT() {
+      demi = row.clientWidth / 2; hautT = row.clientHeight;
+      if (!demi || !NB) { boucle = 0; return false; }
+      ecartT = reglageCss('--ca-ecart', row);
+      var rh = parseFloat(getComputedStyle(items[0]).height), x = 0, lmax = 0;
+      items.forEach(function (it, i) {
+        var w = parseFloat(getComputedStyle(it).width);
+        larg[i] = w; lmax = Math.max(lmax, w);
+        centre[i] = x + w / 2; x += w + ecartT;
+        // Voisine : au plus --ca-vois-h de la hauteur de la rangée et --ca-vois-max de sa propre taille
+        sVois[i] = Math.min(VOIS_MAX, rh * VOIS_H / (w / ratio(oeuvresT[i])));
+      });
+      boucle = x; portee = lmax + ecartT;
+      return true;
+    }
+    // Pose pour la position x : centre à l'écran (depuis le milieu de la rangée), échelle et opacité de chaque
+    // œuvre. L'œuvre la plus proche du milieu d'abord, puis ses voisines de proche en proche : l'écart à l'écran
+    // reste ecartT quelle que soit leur échelle. Rend l'œuvre la plus proche du milieu.
+    function calculer(x) {
+      var c = procheDe(x), vc = ecartDe(c, x), a = Math.abs(vc), h = larg[c] / 2;
+      var tailleA = function (i, v) { var k = lisse(Math.abs(v) / portee); pS[i] = 1 - (1 - sVois[i]) * k; pO[i] = 1 - (1 - VOIS_OP) * k; };
+      tailleA(c, vc);
+      pX[c] = (vc < 0 ? -1 : 1) * (Math.max(0, a - h) + pS[c] * Math.min(a, h));
+      [1, -1].forEach(function (sens) {
+        var j = c, v = vc, n = sens > 0 ? (NB - 1) >> 1 : NB - 1 - ((NB - 1) >> 1);
+        for (var m = 0; m < n; m++) {
+          var j2 = (j + sens + NB) % NB;
+          v += sens * (larg[j] / 2 + ecartT + larg[j2] / 2);
+          tailleA(j2, v);
+          pX[j2] = pX[j] + sens * (pS[j] * larg[j] / 2 + ecartT + pS[j2] * larg[j2] / 2);
+          j = j2;
+        }
+      });
+      return c;
+    }
+    function visibleT(i) { return Math.abs(pX[i]) - pS[i] * larg[i] / 2 < demi; }
+    function poser(tout) {
+      if (!boucle) return;
+      var c = calculer(u);
+      for (var i = 0; i < NB; i++) {
+        // Seules les œuvres à l'écran (ou presque) sont réécrites ; une œuvre qui sort l'est une dernière fois,
+        // hors de la vue, où elle reste (même après un saut de plusieurs œuvres d'une image à l'autre)
+        var proche = Math.abs(pX[i]) - pS[i] * larg[i] / 2 <= demi + 40;
+        if (!tout && !proche && !dedans[i]) continue;
+        dedans[i] = proche;
+        var t = 'translate3d(' + (pX[i] - larg[i] / 2).toFixed(2) + 'px,0,0) scale(' + pS[i].toFixed(4) + ')';
+        if (t !== ecritT[i]) items[i].style.transform = ecritT[i] = t;
+        var o = pO[i].toFixed(3);
+        if (o !== ecritO[i]) items[i].style.opacity = ecritO[i] = o;
+      }
+      // Œuvre du milieu : la seule atteinte par Tab (← → passent aux autres), le cartel la suit
+      if (c !== cT) { if (cT >= 0) items[cT].tabIndex = -1; items[c].tabIndex = 0; cT = c; afficherT(oeuvresT[c]); chargerAutour(c); }
+      // Barre : rang de l'œuvre au milieu (ou juste passée), plus la part du chemin vers la suivante. De la dernière
+      // à la première, le trait sort à droite pendant que sa copie (.r-pos::before) rentre à gauche : pas de saut.
+      var a = ecartDe(c, u) > 0 ? (c - 1 + NB) % NB : c, b = (a + 1) % NB;
+      var f = Math.max(0, Math.min(1, -ecartDe(a, u) / (larg[a] / 2 + ecartT + larg[b] / 2)));
+      var tb = 'translateX(' + ((rangsT[a] + f) * 100).toFixed(1) + '%)';
+      if (tb !== barre) pos.style.transform = barre = tb;
+    }
+    // Le cartel suit l'œuvre du milieu (réécrit seulement quand elle change)
+    function afficherT(x) {
+      heros = x; // au retour sur l'accueil, la rangée repart de cette œuvre
       if ($('[data-m="voir"]', cm).getAttribute('href') === lienOeuvre(x)) return;
       $('[data-m="type"]', cm).textContent = x.type;
       $('[data-m="statut"]', cm).innerHTML = statut(x);
       $('[data-m="voir"]', cm).href = lienOeuvre(x);
     }
-    // Les voisines se chargent d'avance (l'image est prête quand elle arrive)
-    // Une voisine prête hors de l'écran est montrée tout de suite, sans fondu : elle entre déjà dessinée
-    function chargerAutour(i) {
-      [i - 1, i + 1, i + 2, i + 3].forEach(function (k) {
-        var im = items[k] && $('img', items[k]);
-        if (!im) return;
+    // Les voisines se chargent d'avance (2 avant, 3 après). Prête hors de l'écran : montrée d'un coup, sans fondu,
+    // elle entre déjà dessinée. Le tapis attend une image pas encore prête (garde) : jamais de trou.
+    function chargerAutour(c) {
+      for (var k = -2; k <= 3; k++) (function (i) {
+        var im = $('img', items[i]);
+        if (!im || pretes[i] != null) return;
+        pretes[i] = false;
         if (im.loading === 'lazy') im.loading = 'eager';
-        imagePrete(im, 3000).then(function () {
-          if (!quitte && im.complete && im.naturalWidth && !dansFenetre(items[k])) montrerTout(im);
+        imagePrete(im).then(function () {
+          pretes[i] = true;
+          if (quitte) return;
+          if (!visibleT(i) && im.complete && im.naturalWidth) montrerTout(im);
+          if (attente) demander();
         });
-      });
+      })((c + k + NB) % NB);
     }
-    // Barre de position et cartel (une fois par image, rien de lourd)
-    function majRangee() {
-      rafPos = 0;
-      if (offs.length < 2) return;
-      var x = row.scrollLeft, i = indice(x);
-      var a = x >= offs[i] - 1 ? i : i - 1, b = Math.min(a + 1, offs.length - 1);
-      var f = b > a ? Math.max(0, Math.min(1, (x - offs[a]) / (offs[b] - offs[a]))) : 0;
-      var p = Math.min(TOTAL - 1, (a % TOTAL) + f);
-      pos.style.transform = 'translateX(' + (p * 100).toFixed(1) + '%)';
-      if (i !== cur) { cur = i; afficher(PAR_N[items[i].dataset.n]); chargerAutour(i); }
+    // Distance à l'écran avant qu'une œuvre pas encore prête n'entre par la droite (négative : déjà visible)
+    function garde() {
+      var g = Infinity;
+      for (var i = 0; i < NB; i++) {
+        if (pretes[i] === true || pX[i] + pS[i] * larg[i] / 2 <= 0) continue;
+        g = Math.min(g, pX[i] - pS[i] * larg[i] / 2 - demi);
+      }
+      return g;
     }
-    function surDefile() {
-      if (!rafPos) rafPos = requestAnimationFrame(majRangee);
-      if (!auto) repere = performance.now(); // geste de la personne, ou son inertie
-      calme = false;
-      clearTimeout(calmeT);
-      calmeT = setTimeout(auCalme, 180);
+    // (Re)mesure : on garde l'œuvre du milieu et son décalage ; la première fois, l'œuvre du héros au milieu
+    function replacer() {
+      var c = boucle ? cT : oeuvresT.indexOf(heros), d = boucle && c >= 0 ? -ecartDe(c, u) : 0;
+      if (!mesurerT()) return;
+      u = centre[Math.max(0, c)] + d;
+      if (mode === 'ressort') uCible = u + ecartDe(iCible, u);
+      poser(true);
     }
-    // Rangée immobile : recentrage si besoin, puis prochain départ
-    function auCalme() {
-      calmeT = 0; calme = true; auto = false;
-      if (toucher || quitte) return;
-      recentrer().then(planifier);
+    function pauseT() {
+      return !pretT || reduit() || horsVueT || document.hidden || focusK || document.documentElement.classList.contains('bloque');
     }
-    function recentrer() {
-      if (!tel() || offs.length < 3 * TOTAL) return Promise.resolve();
-      var i = indice(row.scrollLeft), c = Math.floor(i / TOTAL);
-      if (c === 1) return Promise.resolve();
-      var j = i + (c === 0 ? TOTAL : -TOTAL);
-      // Les images de l'arrivée sont prêtes et affichées d'un coup (pas de fondu : elles étaient déjà à l'écran)
-      var ims = [j - 1, j, j + 1, j + 2].map(function (k) { return items[k] && $('img', items[k]); }).filter(Boolean);
-      ims.forEach(function (im) { if (im.loading === 'lazy') im.loading = 'eager'; });
-      return Promise.all(ims.map(function (im) { return imagePrete(im, 2000); })).then(function () {
-        if (quitte || toucher || !calme || indice(row.scrollLeft) !== i) return;
-        ims.forEach(function (im) { if (im.complete && im.naturalWidth) montrerTout(im); });
-        auto = true;
-        row.scrollLeft = offs[j] + (row.scrollLeft - offs[i]);
-      });
+    function demander() {
+      attente = false;
+      if (!rafT && !quitte) { tPrec = 0; rafT = requestAnimationFrame(image); }
     }
-    function autoTel() { return pretR && tel() && !reduit() && !quitte && !toucher && !focusR && !horsVueR && !document.hidden; }
-    function planifier() {
-      clearTimeout(autoT); autoT = 0;
-      if (!autoTel()) return;
-      autoT = setTimeout(avancer, Math.max(60, DUREE_TEL - (performance.now() - repere)));
+    // Une image : vitesse qui monte ou descend en douceur, ressort, pose
+    function image(t) {
+      rafT = 0;
+      if (quitte || !tel()) return;
+      if (!boucle) { replacer(); if (!boucle) return; }
+      var dt = tPrec ? Math.min(0.05, Math.max(0, (t - tPrec) / 1000)) : 0;
+      tPrec = t;
+      if (mode === 'auto') {
+        if (pauseT()) { vit = 0; return; }
+        // Vitesse visée : pleine, ralentie puis nulle devant une image pas prête (2 s de marge, sans à-coup)
+        var V = vitesse(), g = garde(), cible = V * Math.max(0, Math.min(1, g / (2 * V)));
+        vit += (cible - vit) * (1 - Math.exp(-dt / 0.45));
+        u += Math.min(vit * dt, Math.max(0, g) / 1.5);
+        if (cible === 0 && vit < 1) { vit = 0; attente = true; } // on attend l'image sans calculer
+      } else if (mode === 'ressort') {
+        // Ressort amorti sans rebond, calculé exactement : stable même quand les images s'espacent (téléphone lent)
+        var w = omega(), x = u - uCible, e = Math.exp(-w * dt), j = (vit + w * x) * dt;
+        u = uCible + (x + j) * e; vit = (vit - w * j) * e;
+        if (Math.abs(u - uCible) < 0.3 && Math.abs(vit) < 5) { u = uCible; vit = 0; mode = 'arret'; }
+      }
+      poser(false);
+      if ((mode === 'auto' && !attente) || mode === 'ressort') rafT = requestAnimationFrame(image);
     }
-    function avancer() {
-      autoT = 0;
-      if (!autoTel()) return;
-      // Page qui défile, menu ou fenêtre ouverts, rangée pas encore immobile : on réessaie un peu plus tard
-      if (!calme || performance.now() - defilePage < 500 || document.documentElement.classList.contains('bloque')) { autoT = setTimeout(avancer, 500); return; }
-      var i = indice(row.scrollLeft), j = i + 1, im = items[j] && $('img', items[j]);
-      if (!im) return;
-      if (im.loading === 'lazy') im.loading = 'eager';
-      // L'œuvre suivante glisse quand son image est prête (au plus 3 s d'attente)
-      imagePrete(im, 3000).then(function () {
-        if (!autoTel() || !calme || indice(row.scrollLeft) !== i) { planifier(); return; }
-        cm.setAttribute('aria-live', 'off'); // pas d'annonce à chaque œuvre pendant l'automatique
-        auto = true; calme = false;
-        repere = performance.now();
-        row.scrollTo({ left: offs[j], behavior: 'smooth' });
-        clearTimeout(calmeT); calmeT = setTimeout(auCalme, 600); // filet, si aucun défilement ne venait
-      });
+    // Pause ou reprise (rangée hors de vue, onglet, menu, message, focus clavier) : rien ne tourne pendant la pause,
+    // la reprise part de l'arrêt
+    function majPause() {
+      if (quitte || !tel() || mode !== 'auto') return;
+      if (!pauseT()) { demander(); return; }
+      vit = 0;
+      if (rafT) { cancelAnimationFrame(rafT); rafT = 0; }
     }
-    // Un geste de la personne : l'automatique s'efface, le cartel reparle aux lecteurs d'écran
-    function gesteTel() { auto = false; repere = performance.now(); cm.setAttribute('aria-live', 'polite'); }
-    ecoute(row, 'scroll', surDefile, { passive: true });
-    ecoute(row, 'touchstart', function () { gesteTel(); toucher = true; clearTimeout(autoT); autoT = 0; }, { passive: true });
-    ['touchend', 'touchcancel'].forEach(function (t) {
-      ecoute(row, t, function () {
-        toucher = false; repere = performance.now();
-        if (calme) { clearTimeout(calmeT); calmeT = setTimeout(auCalme, 180); }
-      }, { passive: true });
+    // L'œuvre i vient au milieu : ressort amorti sans rebond, qui part de la vitesse v (ou tout de suite)
+    function caler(i, v, immediat) {
+      iCible = i; uCible = u + ecartDe(i, u); lance = false;
+      if (immediat) { u = uCible; vit = 0; mode = 'arret'; poser(true); return; }
+      var w = omega() * Math.abs(u - uCible);
+      vit = Math.max(-w, Math.min(w, v || 0)); // pas plus vite que le ressort : on ne dépasse pas l'œuvre
+      mode = 'ressort'; demander();
+    }
+    // Un geste de la personne : le tapis s'arrête, le cartel reparle aux lecteurs d'écran
+    function gesteTel() { clearTimeout(repT); repT = 0; cm.setAttribute('aria-live', 'polite'); }
+    function auto(v) { mode = 'auto'; vit = v || 0; cm.setAttribute('aria-live', 'off'); majPause(); } // (pas d'annonce en défilant)
+    function plusTard() {
+      clearTimeout(repT);
+      repT = setTimeout(function () { repT = 0; if (mode === 'arret' && !reduit()) auto(); }, REPRISE_TEL);
+    }
+    // Doigt (ou souris) : arrêt net ; au-delà de 8 px à l'horizontale, la rangée suit le doigt
+    ecoute(row, 'pointerdown', function (e) {
+      if (!tel() || !boucle || doigt || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      gesteTel(); bloque = 0;
+      var t = performance.now(), xd = e.clientX - row.getBoundingClientRect().left - demi, k = 0;
+      for (var i = 1; i < NB; i++) if (Math.abs(pX[i] - xd) < Math.abs(pX[k] - xd)) k = i;
+      var it = e.target && e.target.closest ? e.target.closest('.r-it') : null;
+      doigt = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, t0: t, glisse: false, pas: [[t, u]], it: k, avant: mode,
+        vit: vit,                                          // vitesse du défilement continu, gardée pour la reprise
+        vise: mode === 'ressort' ? iCible : cT,            // œuvre au milieu (ou qui y va)
+        cible: it ? items.indexOf(it) : -1,                // œuvre touchée (−1 : à côté des œuvres)
+        vite: mode === 'ressort' && lance && Math.abs(vit) > 120 }; // la rangée file encore après un élan
+      mode = 'doigt'; vit = 0;
+      if (rafT) { cancelAnimationFrame(rafT); rafT = 0; }
     });
-    ['wheel', 'keydown', 'pointerdown'].forEach(function (t) { ecoute(row, t, function () { gesteTel(); planifier(); }, { passive: true }); });
-    // Clavier : pause tant que le focus est dans la rangée
-    // (et sur le cartel : « Voir l'œuvre » ne change pas d'œuvre sous le doigt de VoiceOver ou du clavier)
+    ecoute(row, 'pointermove', function (e) {
+      if (!doigt || e.pointerId !== doigt.id) return;
+      if (e.pointerType === 'mouse' && !e.buttons) { lacher(e); return; } // bouton relâché hors de la page
+      if (!doigt.glisse) {
+        var dx = e.clientX - doigt.x0, dy = e.clientY - doigt.y0;
+        if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return; // (à la verticale, la page défile)
+        doigt.glisse = true; doigt.x = e.clientX;
+        try { row.setPointerCapture(e.pointerId); } catch (er) { /* doigt déjà levé */ }
+      }
+      // L'œuvre tenue avance à l'écran autant que le doigt (les voisines, plus petites, vont moins vite)
+      calculer(u); var x1 = pX[doigt.it]; calculer(u + 1);
+      u -= (e.clientX - doigt.x) / Math.max(0.3, Math.min(1.5, x1 - pX[doigt.it]));
+      doigt.x = e.clientX;
+      var t = performance.now();
+      doigt.pas.push([t, u]);
+      while (doigt.pas.length > 2 && t - doigt.pas[0][0] > 100) doigt.pas.shift();
+      demander();
+    });
+    function lacher(e) {
+      if (!doigt || e.pointerId !== doigt.id) return;
+      var d = doigt, t = performance.now(), long = t - d.t0 > 500;
+      doigt = null;
+      if (!d.glisse && !long) {
+        // Geste vertical (la page défile) pendant le défilement continu : il repart tout de suite, à sa vitesse
+        if (e.type === 'pointercancel' && d.avant === 'auto') { auto(d.vit); return; }
+        // Toucher bref sur l'œuvre du milieu : sa fiche s'ouvre (et elle se cale, si aucun clic ne suit). Sur une
+        // voisine : elle vient au milieu, comme sur l'ordinateur. À côté des œuvres, pendant un élan (on l'arrête)
+        // ou geste annulé : la rangée se cale sur l'œuvre la plus proche, sans rien ouvrir.
+        var tap = e.type === 'pointerup' && !d.vite && d.cible >= 0;
+        if (!tap || d.cible !== d.vise) bloque = t + 500;
+        caler(tap ? d.cible : procheDe(u), 0);
+        plusTard(); return;
+      }
+      bloque = t + 500; // un glissement ou un appui long n'ouvre pas la fiche
+      // Élan : vitesse des 100 dernières ms (nulle si le doigt s'est arrêté avant de se lever), au plus 4 œuvres
+      var v = 0, a = d.pas[0], b = d.pas[d.pas.length - 1], m = 4 * boucle / NB;
+      if (d.glisse && !reduit() && t - b[0] < 80 && b[0] - a[0] > 10) v = (b[1] - a[1]) / (b[0] - a[0]) * 1000;
+      caler(procheDe(u + Math.max(-m, Math.min(m, v * 0.35))), v);
+      lance = d.glisse;
+      plusTard();
+    }
+    // Sur window : un bouton de souris relâché hors de la rangée la libère aussi
+    ecoute(window, 'pointerup', lacher, true);
+    ecoute(window, 'pointercancel', lacher, true);
+    // iOS : une fois le glisser horizontal décidé, la page ne le reprend pas en cours de geste
+    ecoute(row, 'touchmove', function (e) { if (doigt && doigt.glisse && e.cancelable) e.preventDefault(); }, { passive: false });
+    // Le clic qui suit un glissement, un appui long, un arrêt ou un toucher sur une voisine n'ouvre pas la fiche
+    // (seulement dans les 500 ms : une activation plus tard, au clavier ou par VoiceOver, passe)
+    ecoute(row, 'click', function (e) { if (performance.now() < bloque) { bloque = 0; e.preventDefault(); e.stopPropagation(); } }, true);
+    // Dernier doigt ou clic (le focus d'un toucher arrive au mousedown, après le lâcher), ou retour sur l'onglet
+    // (le navigateur y rend le focus d'avant, juste après l'événement focus de la fenêtre)
+    ['pointerdown', 'pointerup', 'mousedown'].forEach(function (ty) { ecoute(document, ty, function () { tPointeur = performance.now(); }, true); });
+    ecoute(window, 'focus', function () { tPointeur = performance.now(); });
+    ecoute(row, 'dragstart', function (e) { e.preventDefault(); }); // pas de glisser-déposer des liens et des images
+    ecoute(row, 'scroll', function () { row.scrollLeft = 0; }, { passive: true }); // (sans overflow: clip, rien ne défile)
+    // Clavier : Tab atteint l'œuvre du milieu et la cale ; ← → passent à la voisine (le focus suit) ; le tapis attend
+    // tant que le focus clavier est dans la rangée ou sur « Voir l'œuvre » (l'œuvre ne change pas sous les yeux)
     [row, cm].forEach(function (z) {
       ecoute(z, 'focusin', function (e) {
         var fv = true; try { fv = e.target.matches(':focus-visible'); } catch (x) { /* ancien navigateur */ }
-        if (fv) { focusR = true; gesteTel(); planifier(); }
+        // Focus du clavier ou d'un lecteur d'écran (VoiceOver ne passe pas par :focus-visible) : le tapis attend.
+        // Pas celui que pose un doigt, une souris ou le retour d'une fiche.
+        if (!fv && (focusScript || performance.now() - tPointeur < 600)) return;
+        if (!tel() || !boucle) return;
+        focusK = true; gesteTel();
+        if (mode === 'auto') { mode = 'arret'; majPause(); }
+        var i = items.indexOf(e.target);
+        if (i < 0) i = cT; // « Voir l'œuvre » : son œuvre se cale au milieu
+        if (i >= 0 && !(mode === 'ressort' && iCible === i)) caler(i, 0, reduit());
       });
       ecoute(z, 'focusout', function (e) {
-        if (focusR && !row.contains(e.relatedTarget) && !cm.contains(e.relatedTarget)) { focusR = false; repere = performance.now(); planifier(); }
+        if (focusK && !row.contains(e.relatedTarget) && !cm.contains(e.relatedTarget)) { focusK = false; plusTard(); }
       });
     });
-    ecoute(document, 'visibilitychange', function () { if (!document.hidden) repere = performance.now(); planifier(); });
-    ecoute(mqReduit, 'change', planifier);
-    ecoute(mqOrdi, 'change', planifier);
-    if ('IntersectionObserver' in window) {
-      var ioV = new IntersectionObserver(function (es) {
-        var hv = es[es.length - 1].intersectionRatio < 0.5;
-        if (horsVueR && !hv) repere = performance.now(); // de retour à l'écran : 5 s avant de repartir
-        horsVueR = hv;
-        planifier();
-      }, { threshold: [0, 0.5] });
-      ioV.observe(row);
-      nettoyage.push(function () { ioV.disconnect(); });
-    }
-    // Départ sur la première œuvre de la copie du milieu
-    function placerDepart() {
-      if (!tel() || !items.length) return false;
-      mesurer();
-      if (!offs[TOTAL]) return false;
-      auto = true;
-      row.scrollLeft = offs[TOTAL];
-      clearTimeout(calmeT); calmeT = setTimeout(auCalme, 300);
-      majRangee();
+    function toucheTel(dir) {
+      var a = document.activeElement;
+      if (!boucle || !a || (!row.contains(a) && !cm.contains(a))) return false;
+      focusK = true; gesteTel();
+      var i = ((mode === 'ressort' ? iCible : cT) + dir + NB) % NB;
+      caler(i, mode === 'ressort' ? vit : 0, reduit());
+      if (row.contains(a)) items[i].focus({ preventScroll: true });
       return true;
     }
-    depart = placerDepart();
-    // Taille de la rangée qui change (rotation, passage à la tablette) : on remesure et on garde l'œuvre
-    if ('ResizeObserver' in window) {
-      var roR = new ResizeObserver(function () {
-        if (!tel()) return;
-        if (!depart) { depart = placerDepart(); return; }
-        var k = cur;
-        mesurer();
-        if (k >= 0 && calme && !toucher && offs[k] != null) {
-          auto = true; row.scrollLeft = offs[k];
-          clearTimeout(calmeT); calmeT = setTimeout(auCalme, 300);
-        }
-      });
-      roR.observe(row);
-      nettoyage.push(function () { roR.disconnect(); });
+    ecoute(document, 'visibilitychange', majPause);
+    ecoute(mqOrdi, 'change', majPause);
+    ecoute(mqReduit, 'change', function () {
+      if (reduit() && (mode === 'auto' || mode === 'ressort')) { clearTimeout(repT); if (boucle) caler(cT, 0, true); else mode = 'arret'; }
+      else if (!reduit() && mode === 'arret' && !repT) auto();
+    });
+    if ('IntersectionObserver' in window) {
+      var ioT = new IntersectionObserver(function (es) {
+        horsVueT = es[es.length - 1].intersectionRatio < 0.5;
+        majPause();
+      }, { threshold: [0, 0.5] });
+      ioT.observe(row);
+      nettoyage.push(function () { ioT.disconnect(); });
     }
-    apresMessage(function () { if (quitte) return; pretR = true; repere = performance.now(); planifier(); });
+    // Taille qui change (rotation, passage à la tablette, retour du téléphone) : on remesure et on garde l'œuvre
+    if ('ResizeObserver' in window) {
+      var roT = new ResizeObserver(function () {
+        if (!row.clientWidth) { boucle = 0; return; } // rangée cachée (ordinateur)
+        if (boucle && row.clientWidth / 2 === demi && row.clientHeight === hautT) return;
+        replacer();
+      });
+      roT.observe(row);
+      nettoyage.push(function () { roT.disconnect(); });
+    }
+    // Pose de départ tout de suite (la transition de page la photographie) ; défilement après « OK » sur le message.
+    // Retour d'une fiche : l'œuvre vue au milieu, le tapis repart 5 s après, comme après un geste.
+    items.forEach(function (it) { it.tabIndex = -1; });
+    if (tel()) replacer();
+    if (retourTel && mode === 'auto') { mode = 'arret'; plusTard(); }
+    retourTel = false;
+    cm.setAttribute('aria-live', mode === 'auto' ? 'off' : 'polite');
+    apresMessage(function () { if (quitte) return; pretT = true; majPause(); });
 
     construire();
     majBouton();
@@ -934,19 +1083,22 @@
       quitter: function () {
         quitte = true;
         if (st.anim) st.anim.cancel();
-        if (rafPos) cancelAnimationFrame(rafPos);
-        clearTimeout(autoT); clearTimeout(calmeT);
+        if (rafT) cancelAnimationFrame(rafT);
+        clearTimeout(repT);
         cartJeton++;
         clearTimeout(fileT); clearTimeout(repriseT); file = [];
         Object.keys(departs).forEach(function (n) { clearTimeout(departs[n]); });
         nettoyage.forEach(function (f) { f(); });
       },
-      // ← → quand le héros est visible (ordinateur) : premier geste, donc arrêt du défilement
+      // ← → quand le héros est visible (ordinateur) : premier geste, donc arrêt du défilement.
+      // Téléphone : quand le focus est dans la rangée ou sur « Voir l'œuvre ».
       touche: function (dir) {
-        if (!mqOrdi.matches || st.horsVue) return false;
+        if (!mqOrdi.matches) return toucheTel(dir);
+        if (st.horsVue) return false;
         geste(dir);
         return true;
-      }
+      },
+      majPause: majPause // menu, visionneuse ou message ouverts ou fermés (bloquer)
     };
   }
 
@@ -1558,6 +1710,8 @@
     var nQuitte = retour ? actuel.oeuvre.n : null;
 
     if (quitterPage) { quitterPage(); quitterPage = null; }
+    // Téléphone : retour d'une fiche sur l'accueil, la rangée repart de l'œuvre vue
+    if (nQuitte && r.page === 'accueil' && !mqOrdi.matches) { heros = PAR_N[nQuitte]; retourTel = true; }
     var p = PAGES[r.page](r);
     blocs = [];
     document.body.setAttribute('data-page', r.page);
@@ -1591,7 +1745,7 @@
           carteQ = cs.filter(dansFenetre)[0] || cs[0] || null;
         }
         var cibleF = focusApres || carteQ || h1;
-        if (cibleF) cibleF.focus({ preventScroll: true });
+        if (cibleF) { focusScript = true; cibleF.focus({ preventScroll: true }); focusScript = false; }
       }
     }
     preparerApparitions();
@@ -1607,7 +1761,7 @@
     if (!a) { dernierClic = null; return; }
     var img = a.querySelector('img');
     if (!img && a.closest('.hero-d')) img = $('.ca-it.centre img', main);
-    if (!img && a.closest('.cartel-m')) img = $$('.r-it[href="' + a.getAttribute('href') + '"] img', main).filter(dansFenetre)[0] || null; // (la copie visible)
+    if (!img && a.closest('.cartel-m')) img = $$('.r-it[href="' + a.getAttribute('href') + '"] img', main).filter(dansFenetre)[0] || null; // (si elle est à l'écran)
     dernierClic = { href: a.getAttribute('href'), img: img, t: Date.now() };
   }, true);
 
@@ -1616,7 +1770,7 @@
     var c = $$('a[href="#/oeuvre/' + n + '"] img', main).filter(function (i) { return i.getBoundingClientRect().width > 0; });
     var vu = c.filter(dansFenetre)[0];
     if (vu) return vu;
-    // Rangée du téléphone : on ne la fait pas sauter vers une copie hors de l'écran (pas de cible, simple fondu)
+    // Rangée du téléphone : on ne la fait pas sauter vers une œuvre hors de l'écran (pas de cible, simple fondu)
     c = c.filter(function (i) { return !i.closest('.rangee'); });
     if (c[0]) { c[0].scrollIntoView({ block: 'center', inline: 'nearest' }); return c[0]; }
     return null;
@@ -1706,6 +1860,7 @@
   function bloquer(oui) {
     var ouvert = oui || !menu.hidden || !visio.hidden || !!(msg && msg.open);
     document.documentElement.classList.toggle('bloque', ouvert);
+    if (car && car.majPause) car.majPause(); // le tapis du téléphone s'arrête ou repart
   }
   function ouvrirMenu() {
     menu.hidden = false;
@@ -1850,13 +2005,14 @@
   document.getElementById('proto-msg').addEventListener('click', ouvrirMessage);
 
   /* ---------- En-tête collant : verre dès qu'il colle en haut (classe utilisée par verre.css) ---------- */
+  // Ordinateur seulement : sur téléphone et tablette, l'en-tête a un fond plein permanent (V6), rien à recalculer.
   var hdEl = document.getElementById('hd'), rafDefile = 0;
   function majDefile() {
     rafDefile = 0;
-    document.documentElement.classList.toggle('hd-colle', window.scrollY > 0 && hdEl.getBoundingClientRect().top <= 0);
+    document.documentElement.classList.toggle('hd-colle', mqOrdi.matches && window.scrollY > 0 && hdEl.getBoundingClientRect().top <= 0);
   }
-  // (defilePage : la rangée de l'accueil attend que la page soit immobile pour glisser)
-  window.addEventListener('scroll', function () { defilePage = performance.now(); if (!rafDefile) rafDefile = requestAnimationFrame(majDefile); }, { passive: true });
+  window.addEventListener('scroll', function () { if (mqOrdi.matches && !rafDefile) rafDefile = requestAnimationFrame(majDefile); }, { passive: true });
+  if (mqOrdi.addEventListener) mqOrdi.addEventListener('change', majDefile);
 
   /* ---------- Redimensionnement ---------- */
   var minuterie = null;

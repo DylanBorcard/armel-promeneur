@@ -1,5 +1,5 @@
-/* Prototype du site d'Armel Promeneur (V5) — styles. V5 : rangée de l'accueil et apparitions du téléphone ;
-   l'ordinateur (≥ 1024 px) ne change pas.
+/* Prototype du site d'Armel Promeneur (V6) — styles. V6 : tapis roulant de l'accueil du téléphone ; V5 : apparitions
+   du téléphone. L'ordinateur (≥ 1024 px) ne change pas.
    Jetons repris du canevas. Une seule couleur ajoutée : le rouge de la pastille « vendue ».
    Mouvement : seulement transform, opacity et clip-path ; deux courbes pour les pages (entrée, interface).
    Les réglages du carrousel et des boutons ronds sont regroupés dans :root (--ca-*, --cartel-*, --fl-*).
@@ -351,7 +351,7 @@ main { flex: 1 0 auto; }
   .cart-titre { font-size: 22px; }
 }
 
-/* Téléphone et tablette : rangée native à faire glisser (scroll-snap), la suivante dépasse */
+/* Téléphone et tablette : tapis roulant (V6), un bout des voisines de chaque côté */
 @media (max-width: 1023px) {
   .hero-in { display: block; min-height: 0; padding: 14px 0 22px; }
   .hero-g { display: block; padding: 0; }
@@ -359,27 +359,36 @@ main { flex: 1 0 auto; }
   .hero-nav, .hero-c, .hero-d { display: none; }
   .hero-m { display: block; }
 }
-/* V5 : hauteur commune, chaque emplacement a la largeur de son œuvre (plafonnée), écart constant de 14 px :
-   plus de trou, la suivante dépasse toujours à droite. Trois copies de la liste pour la boucle (app.js). */
+/* V6 : les œuvres sont posées en absolu au milieu de la rangée et déplacées par app.js (translate3d + scale et
+   opacity seulement) : l'œuvre du milieu en grand, un bout de la précédente et de la suivante, plus petites et plus
+   pâles (réglages --ca-vois-*, comme l'ordinateur), bords en fondu. Le doigt glisse à l'horizontale, la page
+   défile à la verticale (pan-y). */
 .rangee {
-  position: relative; display: flex; gap: 14px; overflow-x: auto; overscroll-behavior-x: contain;
-  scroll-snap-type: x mandatory; scroll-padding-inline: var(--g);
-  padding: 6px var(--g) 22px; scrollbar-width: none;
-  --cap: min(82vw, 440px);                                                 /* largeur maximale d'une œuvre */
-  --rh: max(300px, min(calc(var(--cap) * 1.25), calc(100svh - 330px)));   /* hauteur commune */
+  position: relative; height: calc(var(--rh) + 28px); padding: 6px 0 22px;
+  overflow: hidden; touch-action: pan-y pinch-zoom; -webkit-user-select: none; user-select: none;
+  --cap: min(66vw, 440px);                                                 /* largeur maximale de l'œuvre du milieu */
+  --rh: max(300px, min(calc(var(--cap) * 1.25), calc(100svh - 330px)));   /* hauteur de l'œuvre du milieu */
+  --fondu-m: calc(var(--ca-fondu) / 2);                                    /* (les bouts de voisines sont étroits) */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--fondu-m), #000 calc(100% - var(--fondu-m)), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 var(--fondu-m), #000 calc(100% - var(--fondu-m)), transparent 100%);
 }
-@media (max-width: 759px) { .rangee { gap: 16px; } }  /* = la marge : l'œuvre précédente s'arrête pile au bord de l'écran */
-.rangee::-webkit-scrollbar { display: none; }
-.rangee:focus-visible { outline-offset: -4px; }
+@supports (overflow: clip) { .rangee { overflow: visible; overflow-x: clip; } }  /* coupée sur les côtés, rien à faire défiler */
 @media (min-width: 600px) and (max-width: 1023px) {
   .rangee { --rh: max(300px, min(calc(var(--cap) * 1.25), calc(100svh - 440px))); }  /* tablette : le haut de la section suivante dépasse */
 }
-.r-it { flex: none; display: flex; align-items: center; width: min(calc(var(--rh) * var(--r)), var(--cap)); height: var(--rh); scroll-snap-align: start; }
+.r-it {
+  position: absolute; left: 50%; top: 6px; display: flex; align-items: center;
+  width: min(calc(var(--rh) * var(--r)), var(--cap)); height: var(--rh);
+  will-change: transform; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; -webkit-user-drag: none;
+}
+.r-it:focus-visible { outline: none; }
+.r-it:focus-visible .r-cad { outline: 2px solid var(--noir); outline-offset: 4px; }
 /* L'ombre est sur le cadre, pas sur l'image ; l'image le remplit (cadre aux proportions de l'œuvre) */
 .r-cad { display: block; width: 100%; aspect-ratio: var(--r); box-shadow: var(--ombre-m); }
-.r-cad img { display: block; width: 100%; height: 100%; max-width: none; object-fit: cover; }
+.r-cad img { display: block; width: 100%; height: 100%; max-width: none; object-fit: cover; -webkit-user-drag: none; }
 .r-barre { position: relative; height: 2px; margin: 0 var(--g); background: rgba(17,17,17,.14); overflow: hidden; }
 .r-pos { position: absolute; left: 0; top: 0; bottom: 0; background: var(--noir); }
+.r-pos::before { content: ""; position: absolute; top: 0; bottom: 0; width: 100%; left: calc(-100% * var(--nb)); background: inherit; } /* copie, une barre plus à gauche (passage de la dernière œuvre à la première) */
 .cartel-m { margin: 16px var(--g) 0; }
 .cart-titre-m { font-family: var(--f-titre); font-weight: 500; font-size: 22px; line-height: 1.25; letter-spacing: -0.02em; }
 .cart-titre-m .an { font-size: 15px; letter-spacing: 0; }

@@ -2,7 +2,8 @@
    TOUT l'effet est ici. Pour revenir en arrière : retirer la ligne « verre.css » de index.html ;
    styles.css garde alors des boutons blancs opaques avec une ombre douce et des cartouches blancs.
    Endroits : flèches (accueil et fiche), pilule Pause, cartouches des simulations, message d'accueil,
-   en-tête collant pendant le défilement (ordinateur seulement depuis la V5), menu plein écran du téléphone.
+   en-tête collant pendant le défilement (ordinateur seulement ; fond plein sur téléphone et tablette depuis la V6),
+   menu plein écran du téléphone.
    Boutons noirs (« Écrire à Armel », « Acheter ») : pas de verre. */
 
 :root {
@@ -69,14 +70,13 @@
   opacity: 0; transition: opacity .25s var(--e-ui);
 }
 html.hd-colle .hd::before { opacity: 1; }
-html.hd-colle [data-page="accueil"] .hd { background: transparent; }
-[data-page="accueil"] .hd::before { background: rgba(236,235,232,.75); transition: none; }  /* teinte du mur, sans fondu */
-/* Téléphone et tablette (V5) : pas de flou sous l'en-tête pendant le défilement (il se recalcule à chaque image
-   sur iPhone) ; fond presque opaque, rendu quasi identique. Le verre reste sur les flèches, le menu et le message. */
+/* Téléphone et tablette (V6) : fond plein en permanence, sans bascule ni fondu (sur iPhone, la bascule pendant
+   le défilement le rendait transparent par moments). Accueil : teinte du mur (styles.css). Le verre reste sur
+   les flèches, le menu et le message. */
 @media (max-width: 1023px) {
-  .hd::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(250,250,248,.97); }
-  [data-page="accueil"] .hd::before { background: rgba(236,235,232,.97); }
-  /* (cartouches des vues simulées : même chose, ils défilent avec la page) */
+  .hd { background: var(--fond); }
+  .hd::before { content: none; }
+  /* (cartouches des vues simulées : pas de flou non plus, ils défilent avec la page) */
   .cto { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(255,255,255,.94); }
 }
 /* Ce qui colle ou défile vers un titre passe sous l'en-tête */
