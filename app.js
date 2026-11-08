@@ -2013,8 +2013,8 @@
      carrousel, tapis roulant et formulaire continuent. Mémorisé par appareil ; l'état est posé avant le premier
      affichage par le petit script en tête d'index.html. Cachée quand le menu, la visionneuse ou le message sont ouverts. */
   var CLE_SIMU = 'armel-proto-simulation';
-  var btnSimu = document.getElementById('simu-btn');
-  if (btnSimu) {
+  // Deux boutons : dans la barre du haut sur téléphone (immobile), pastille en bas à gauche dès 760 px
+  $$('.simu-btn').forEach(function (btnSimu) {
     btnSimu.setAttribute('aria-pressed', String(simuOn()));
     appui(btnSimu, false);
     btnSimu.addEventListener('click', function () {
@@ -2039,15 +2039,14 @@
         var dy = rep.getBoundingClientRect().top - y0;
         if (Math.abs(dy) >= 1) window.scrollTo(0, window.scrollY + dy);
       }
-      btnSimu.setAttribute('aria-pressed', String(on));
+      $$('.simu-btn').forEach(function (b) { b.setAttribute('aria-pressed', String(on)); });
       // Menu déroulant du formulaire : « (vendue, exemple) » ou « (vendue) » (le CSS n'atteint pas le texte d'une option)
       $$('option[data-vendue]').forEach(function (op) { op.textContent = op.textContent.replace(/ \(vendue[^)]*\)$/, '') + libVendue(); });
       try { window.localStorage.setItem(CLE_SIMU, on ? '1' : '0'); } catch (e) { /* le site marche sans */ }
       var an = document.getElementById('annonce');
       if (an) an.textContent = on ? 'Simulation : informations inventées' : 'Annotations affichées';
     });
-
-  }
+  });
 
   /* ---------- Message d'accueil de Dylan (fenêtre au milieu de l'écran) ----------
      Une fois par appareil (mémorisé), puis « Relire le message » dans le bandeau le rouvre.

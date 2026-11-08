@@ -1098,14 +1098,24 @@ html.simu .vue-b.sig-cache { display: none; }
 html.simu .simu-btn { background: var(--noir); border-color: var(--noir); color: #fff; }
 html.simu .simu-pi { background: #fff; }
 html.simu .simu-pi::before { transform: translateX(10px); background: var(--noir); box-shadow: none; }
-html.bloque .simu-btn { display: none; }
+html.bloque .simu-flot { display: none; }
 @media (max-width: 759px) {
   .simu-btn { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); height: 36px; padding: 0 12px 0 8px; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px -8px rgba(0,0,0,.28); }
   .simu-btn::after { inset: -5px; }  /* 46 px */
 }
 @media (min-width: 1024px) { .simu-btn { right: auto; left: 24px; } }
 /* Pastille immobile (V7.1) : marge sous le pied de page pour qu'elle ne cache rien tout en bas */
-.pied { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 760px) { .pied { padding-bottom: 72px; } }
+/* Téléphone : bouton dans la barre du haut, à gauche de « Menu », sans pastille ni ombre (la barre est collée et pleine) */
+@media (max-width: 759px) {
+  .simu-flot { display: none; }
+  .simu-hd { position: relative; right: auto; bottom: auto; z-index: auto; flex: none; height: 44px; margin: 0 0 0 auto; padding: 0 4px; gap: 6px; border: 0; background: transparent; box-shadow: none; font-size: 12px; }
+  html.simu .simu-hd { background: transparent; color: var(--noir); }
+  html.simu .simu-hd .simu-pi { background: var(--noir); }
+  html.simu .simu-hd .simu-pi::before { background: #fff; }
+}
+@media (max-width: 359px) { .simu-hd .simu-t { display: none; } }
+@media (min-width: 760px) { .simu-hd { display: none; } }
 @media print { .simu-btn { display: none; } }
 
 /* ---------- Mouvements réduits : tout mouvement coupé ---------- */
